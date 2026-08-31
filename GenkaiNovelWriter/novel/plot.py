@@ -4,11 +4,14 @@ from dataclasses import dataclass
 class Plot:
     """
     構造化されたアイデア…もといプロット。
+    Attributes:
+        characters(list):Characterのリスト
+        settings(list): Settingのリスト
+        scenes(list): Scenesのリスト
     """
     characters: list
     settings: list
     scenes: list
-
 @dataclass
 class Character:
     name: str
@@ -17,12 +20,12 @@ class Character:
     notes: str
 
 @dataclass
-class Settings:
+class Setting:
     name: str
     notes: str
 
 @dataclass
-class Scenes:
+class Scene:
     name: str
     summary: str
     detail: str
