@@ -1,6 +1,12 @@
 from pathlib import Path
 import json
 
+"""
+ファイル操作を行う簡易メソッドのモジュール
+
+TODO: ファイル操作に直接関係しない要素が含まれている者は別に取り出しておく
+"""
+
 def get_root():
     return Path(__file__).resolve().parent.parent
 
@@ -21,6 +27,14 @@ def read_model(file_name) -> str:
         content = file.read()
         return content
 
+def read_json(json_file) -> dict:
+    if not json_file:
+        raise ValueError("Illegal argument json file input")
+    base_dir = get_root()
+    file_path = base_dir / json_file
+    with open(file_path) as f:
+        return json.load(f)
+
 def read_models(json_file=".env/model.json") -> dict:
     """
     modelを参照する関数。以下の構造から成る。
@@ -32,7 +46,4 @@ def read_models(json_file=".env/model.json") -> dict:
     ```
     @Exception: OSError
     """
-    base_dir = get_root()
-    file_path = base_dir / json_file
-    with open(file_path) as f:
-        return json.load(f)
+    return read_json(json_file)

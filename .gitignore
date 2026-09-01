@@ -1,2 +1,4 @@
 GenkaiNovelWriter/model.md
 GenkaiNovelWriter/.env
+*.pyc
+__pycache__/
