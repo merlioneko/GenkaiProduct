@@ -93,7 +93,7 @@ class OpenRouterGateWay:
         return self.client.chat.completions.create(
             model=self.model,
             messages=message,
-            response_format=response_format
+            #response_format=response_format TODO: response_format　調べる
         )
 
 def connect_openrouter(model):

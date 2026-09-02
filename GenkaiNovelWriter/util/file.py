@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 
 """
 ファイル操作を行う簡易メソッドのモジュール
