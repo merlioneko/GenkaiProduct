@@ -1,0 +1,108 @@
+{
+  "type": "object",
+  "description": "小説の登場人物、舞台設定、重要なシーンをまとめた情報を入れるための定義です。",
+  "properties": {
+    "Characters": {
+      "type": "array",
+      "description": "登場人物の一覧を入れる項目です。",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "description": "1人の人物に関する情報を入れる項目です。",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "人物の名前を入れます。"
+          },
+          "persona": {
+            "type": "string",
+            "description": "人物の性格や価値観を簡潔に書きます。"
+          },
+          "speech_examples": {
+            "type": "array",
+            "description": "その人物の口調や話し方の例を入れます。",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "description": "発言の例文を入れます。"
+            }
+          },
+          "notes": {
+            "type": "string",
+            "description": "人物に関する補足情報や背景を入れます。"
+          }
+        },
+        "required": [
+          "name",
+          "persona",
+          "speech_examples",
+          "notes"
+        ],
+        "additionalProperties": false
+      }
+    },
+
+    "Settings": {
+      "type": "array",
+      "description": "舞台や背景設定の一覧を入れる項目です。",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "description": "1つの設定に関する情報を入れる項目です。",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "場所や舞台の名前を入れます。"
+          },
+          "kind": {
+            "type": "string",
+            "description": "場所の種類やカテゴリを入れます。"
+          },
+          "notes": {
+            "type": "string",
+            "description": "その場所の雰囲気や背景情報を入れます。"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "notes"
+        ],
+        "additionalProperties": false
+      }
+    },
+
+    "Scenes": {
+      "type": "array",
+      "description": "物語の重要なシーン一覧を入れる項目です。",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "description": "1つのシーンに関する情報を入れる項目です。",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "シーンの名前や見出しを入れます。"
+          },
+          "summary": {
+            "type": "string",
+            "description": "そのシーンで起きる出来事の要点を入れます。"
+          }
+        },
+        "required": [
+          "name",
+          "summary"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+
+  "required": [
+    "Characters",
+    "Settings",
+    "Scenes"
+  ],
+
+  "additionalProperties": false
+}
