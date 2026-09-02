@@ -1,4 +1,4 @@
-from util.gateway import connect_lm_studio, generate_text
+from util.gateway import connect_lm_studio, generate_text, connect_openrouter
 from util.file import read_prompt, read_pipeline_prompt, read_model
 from novel.engine import improving, structuring, writing
 
@@ -11,8 +11,10 @@ except:
     user_idea = input("Enter your idea: ")
 
 try:
-    client = connect_lm_studio(read_model("model.md"))
+    #client = connect_lm_studio(read_model("model.md"))
+    client = connect_openrouter(read_model("model.md"))
     print("接続成功: OpenAI APIに接続しました。")
+    input("Enterを押すと処理を開始します。")
 
     improved_idea = improving(client, user_idea)
     print("改善されたアイデア:", improved_idea)

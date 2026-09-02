@@ -1,4 +1,4 @@
-from openai import OpenAI
+from openai import Omit, OpenAI
 from util.file import read_json
 
 def create_message(history: list = [], system:str = "", user:str = "") -> list:
@@ -20,9 +20,12 @@ class LmStudioGateway:
         api_key = "lm-studio"
         self.client = OpenAI(base_url=url, api_key=api_key)
 
-    def chat_response(self, message: list):
+    def chat_response(self, message: list, response_format: dict = {}):
         if self.client is None:
             raise ValueError("Client is not connected. Please call connect() first.")
+
+        # TODO: response_formatの実装
+
         return self.client.chat.completions.create(
             model=self.model,
             messages=message
@@ -50,12 +53,13 @@ class OpenRouterGateWay:
         url = openrouter["url"]
         api_key = openrouter["api_key"]
         self.client = OpenAI(base_url=url, api_key=api_key)
-    def chat_response(self, message: list):
+    def chat_response(self, message: list, response_format: str | None = None):
         if self.client is None:
             raise ValueError("Client is not connected. Please call connect() first.")
         return self.client.chat.completions.create(
             model=self.model,
-            messages=message
+            messages=message,
+            response_format=response_format
         )
 
 def connect_openrouter(model):
@@ -71,9 +75,11 @@ def connect_openrouter(model):
         raise ConnectionError(f"Failed to connect to the API: {e}")
     return client
 
-def generate_text(gateway, system: str, user: str, history:list|None = None) -> str:
+def generate_text(gateway, system: str, user: str, history:list = []) -> str:
     if gateway.client is None:
         raise ValueError("Client is not connected. Please call connect() first.")
-    response = gateway.chat_response(history=history, system=system, user=user)
+    response = gateway.chat_response(
+        create_message(history=history, system=system, user=user)
+        )
     result = response.choices[0].message.content
     return result
