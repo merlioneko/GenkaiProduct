@@ -19,9 +19,11 @@ try:
 
     improved_idea = improving(client, user_idea)
     print("改善されたアイデア:", improved_idea)
+    input("Enterを押すと処理を開始します。")
 
     plot = structuring(client, improved_idea)
     print("構造化されたアイデア:", plot)
+    input("Enterを押すと処理を開始します。")
 
     novel = writing(client, plot)
 
