@@ -1,7 +1,5 @@
 from util.file import read_json
 
-from pathlib import Path
-
 class ModelConfig:
     def __init__(self, config_file=".env/model.json"):
         self.config_file = config_file

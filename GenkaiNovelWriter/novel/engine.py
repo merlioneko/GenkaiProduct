@@ -2,8 +2,7 @@ from typing import cast
 
 from util.file import read_pipeline_prompt
 from util.gateway import generate_text, generate_formated
-from novel.plot import Plot, parse_plot
-import json
+from novel.plot import Plot
 
 """
 具体的なパイプライン処理を担うモジュール

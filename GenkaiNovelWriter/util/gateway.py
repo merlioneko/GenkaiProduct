@@ -29,7 +29,7 @@ class OpenAiApiGateWay(ABC):
     def connect(self):
         pass
 
-    def chat_response(self, message: list, response_format: str | None = None):
+    def chat_response(self, message: list):
         if self.client is None:
             raise ValueError("Client is not connected. Please call connect() first.")
         return self.client.chat.completions.create(
@@ -86,7 +86,7 @@ class LmStudioGateway(OpenAiApiGateWay):
     def connect(self, url="http://localhost:1234/v1", api_key="lm-studio"):
         self.client = OpenAI(base_url=url, api_key=api_key)
 
-def connect_lm_studio(model):
+def connect_lm_studio(model: str):
     client = LmStudioGateway(model)
     try:
         client.connect()
@@ -106,7 +106,7 @@ class OpenRouterGateWay(OpenAiApiGateWay):
         api_key = openrouter["api_key"]
         self.client = OpenAI(base_url=url, api_key=api_key)
 
-def connect_openrouter(model):
+def connect_openrouter(model: str):
     client = OpenRouterGateWay(model)
     try:
         client.connect()
