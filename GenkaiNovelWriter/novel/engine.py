@@ -1,5 +1,7 @@
+from typing import cast
+
 from util.file import read_pipeline_prompt
-from util.gateway import generate_text
+from util.gateway import generate_text, generate_formated
 from novel.plot import Plot, parse_plot
 import json
 
@@ -22,22 +24,16 @@ def improving(client, user_idea):
     return improved_idea
 
 def structuring(client, improved_data):
-    try_count = 0
-    for _ in range(try_count):
-        structured_idea = generate_text(gateway=client,
-                                        system=read_pipeline_prompt("prompts/system_structuring.md"),
-                                        user=improved_data)
-        try:
-            json_data = json.loads(structured_idea)
-            return parse_plot(json_data)
-        except json.JSONDecodeError:
-            continue
-    raise RuntimeError("Parse Error. LLM cannot create json data")
+    structured_idea = generate_formated(gateway=client,
+                                    system=read_pipeline_prompt("prompts/system_structuring.md"),
+                                    user=improved_data,
+                                    base_model=Plot)
+    return cast(Plot, structured_idea)
 
 def writing(client, plot: Plot):
     novel = ""
-    for scene in plot.scenes:
-        novel += generate_text(client,
-                               read_pipeline_prompt("prompts/system_writing.md"),
-                               scene)
+    for scene in plot.Scenes:
+        novel += generate_text(gateway=client,
+                               system=read_pipeline_prompt("prompts/system_writing.md"),
+                               user=f"Scene: {scene.name}\nSummary: {scene.summary}")
     return novel

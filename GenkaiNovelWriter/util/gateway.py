@@ -1,13 +1,14 @@
 import json
+from abc import ABC, abstractmethod
 
-from openai import OpenAI
 from openai import BadRequestError
+from openai import OpenAI
 from util.tools import Tavily
+from pydantic import BaseModel
 
 MAX_SEARCH_RESULTS = 5
 MAX_RESULT_CONTENT_LENGTH = 1000
 MAX_SEARCH_CONTEXT_LENGTH = 6000
-from openai import Omit, OpenAI
 from util.file import read_json
 
 def create_message(history: list = [], system:str = "", user:str = "") -> list:
@@ -19,22 +20,37 @@ def create_message(history: list = [], system:str = "", user:str = "") -> list:
         message = history + message
     return message
 
-class LmStudioGateway:
+class OpenAiApiGateWay(ABC):
     def __init__(self, model):
         self.model = model
         self.client = None
-    def connect(self, url="http://localhost:1234/v1", api_key="lm-studio"):
-        self.client = OpenAI(base_url=url, api_key=api_key)
-    def chat_response(self, message: list, response_format: dict = {}):
+
+    @abstractmethod
+    def connect(self):
+        pass
+
+    def chat_response(self, message: list, response_format: str | None = None):
         if self.client is None:
             raise ValueError("Client is not connected. Please call connect() first.")
-
-        # TODO: response_formatの実装
-
         return self.client.chat.completions.create(
             model=self.model,
             messages=message
         )
+
+    def chat_formated(self, message: list, base_model: type[BaseModel]) -> BaseModel:
+        if self.client is None:
+            raise ValueError("Client is not connected. Please call connect() first.")
+
+        response = self.client.chat.completions.parse(
+            model=self.model,
+            messages=message,
+            response_format=base_model
+        )
+        if response.choices[0].message.parsed:
+            return response.choices[0].message.parsed
+        else:
+            raise ValueError("Failed to parse the response.")
+
     def chat(self, messages):
         if self.client is None:
             raise ValueError("Client is not connected. Please call connect() first.")
@@ -65,6 +81,11 @@ class LmStudioGateway:
         )
         return response.choices[0].message
 
+
+class LmStudioGateway(OpenAiApiGateWay):
+    def connect(self, url="http://localhost:1234/v1", api_key="lm-studio"):
+        self.client = OpenAI(base_url=url, api_key=api_key)
+
 def connect_lm_studio(model):
     client = LmStudioGateway(model)
     try:
@@ -78,23 +99,12 @@ def connect_lm_studio(model):
         raise ConnectionError(f"Failed to connect to the API: {e}")
     return client
 
-class OpenRouterGateWay:
-    def __init__(self, model):
-        self.model = model
-        self.client = None
+class OpenRouterGateWay(OpenAiApiGateWay):
     def connect(self):
         openrouter = read_json(".env/key.json")["openrouter"]
         url = openrouter["url"]
         api_key = openrouter["api_key"]
         self.client = OpenAI(base_url=url, api_key=api_key)
-    def chat_response(self, message: list, response_format: str | None = None):
-        if self.client is None:
-            raise ValueError("Client is not connected. Please call connect() first.")
-        return self.client.chat.completions.create(
-            model=self.model,
-            messages=message,
-            #response_format=response_format TODO: response_format　調べる
-        )
 
 def connect_openrouter(model):
     client = OpenRouterGateWay(model)
@@ -118,6 +128,15 @@ def generate_text(gateway, system: str, user: str, history:list = []) -> str:
     result = response.choices[0].message.content
     return result
 
+def generate_formated(gateway, system: str, user: str, base_model: type[BaseModel], history:list = []) -> BaseModel:
+    if gateway.client is None:
+        raise ValueError("Client is not connected. Please call connect() first.")
+    response = gateway.chat_formated(
+        create_message(history=history, system=system, user=user),
+        base_model=base_model
+        )
+    return response
+
 def _compact_search_result(result) -> str:
     if not isinstance(result, dict):
         return json.dumps(result, ensure_ascii=False)[:MAX_SEARCH_CONTEXT_LENGTH]
@@ -138,7 +157,7 @@ def _compact_search_result(result) -> str:
     )[:MAX_SEARCH_CONTEXT_LENGTH]
 
 
-def generate_with_search(gateway: LmStudioGateway, system, user, search_tool: Tavily):
+def generate_with_search(gateway: OpenAiApiGateWay, system, user, search_tool: Tavily):
     result = search_tool.execute(user)
     messages = [
         {"role": "system", "content": system},

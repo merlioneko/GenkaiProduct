@@ -13,14 +13,16 @@ except:
 try:
     #client = connect_lm_studio(read_model("model.md"))
     client = connect_openrouter(read_model("model.md"))
-    print("接続成功: OpenAI APIに接続しました。")
+    print(f"接続成功: OpenAI APIに接続しました。\n{client}")
     input("Enterを押すと処理を開始します。")
 
     improved_idea = improving(client, user_idea)
     print("改善されたアイデア:", improved_idea)
+    input("Enterを押すと処理を開始します。")
 
     plot = structuring(client, improved_idea)
     print("構造化されたアイデア:", plot)
+    input("Enterを押すと処理を開始します。")
 
     novel = writing(client, plot)
 
