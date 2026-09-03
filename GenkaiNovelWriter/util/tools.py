@@ -1,8 +1,10 @@
 from tavily import TavilyClient
-from .file import read_env
+from util.env import ToolsConfig
 
 class Tavily:
-    def __init__(self, client: TavilyClient=TavilyClient(api_key=read_env("tavily.md"))):
+    def __init__(self, client: TavilyClient | None = None):
+        if not client:
+            client = TavilyClient(api_key=ToolsConfig().get_search_tool()["tavily"]["api_key"])
         self.client = client
         self.tool = [
             {
@@ -30,12 +32,3 @@ class Tavily:
             search_depth="advanced"
         )
         return response
-
-def test():
-    client = TavilyClient(api_key=read_env("tavily.md"))
-    tavily_tool = Tavily(client)
-    result = tavily_tool.execute("最新のAIニュース 2026年")
-    print(result)
-
-if __name__ == "__main__":
-    test()

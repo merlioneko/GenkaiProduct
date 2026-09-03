@@ -83,7 +83,7 @@ class OpenRouterGateWay:
         self.model = model
         self.client = None
     def connect(self):
-        openrouter = read_json(".env/key.json")["openrouter"]
+        openrouter = read_json(".env/gateway.json")["openrouter"]
         url = openrouter["url"]
         api_key = openrouter["api_key"]
         self.client = OpenAI(base_url=url, api_key=api_key)
