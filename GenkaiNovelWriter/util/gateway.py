@@ -122,6 +122,7 @@ def connect_openrouter(model: str):
 def generate_text(gateway, system: str, user: str, history:list = []) -> str:
     if gateway.client is None:
         raise ValueError("Client is not connected. Please call connect() first.")
+    print(f"System: {system}\nUser: {user}")
     response = gateway.chat_response(
         create_message(history=history, system=system, user=user)
         )

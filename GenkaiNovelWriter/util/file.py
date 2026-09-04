@@ -27,3 +27,11 @@ def read_json(json_file) -> dict:
     file_path = base_dir / json_file
     with open(file_path) as f:
         return json.load(f)
+
+def output_creation(directory: str, file_name: str, content: str):
+    base_dir = get_root()
+    directory_path = base_dir / directory
+    directory_path.mkdir(parents=True, exist_ok=True)
+    file_path = directory_path / file_name
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write(content)
