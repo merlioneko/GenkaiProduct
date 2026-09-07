@@ -2,7 +2,7 @@ from datetime import datetime
 from rich.console import Console
 
 from util.gateway import connect_lm_studio, connect_openrouter
-from util.file import read_prompt, output_creation
+from util.file import read_file, output_creation
 from util.env import ModelConfig
 from novel.engine import improving, structuring, writing
 
@@ -10,7 +10,7 @@ console = Console()
 
 # Generate improved idea ... ユーザプロンプトの入力があれば
 try:
-    user_idea = read_prompt("prompts/user_prompt.txt")
+    user_idea = read_file("prompts/user_prompt.txt")
     if not user_idea or user_idea == "":
         raise RuntimeError("Illegal values input")
 except:

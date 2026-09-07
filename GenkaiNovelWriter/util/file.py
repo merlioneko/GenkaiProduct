@@ -10,7 +10,7 @@ TODO: ファイル操作に直接関係しない要素が含まれている者�
 def get_root():
     return Path(__file__).resolve().parent.parent
 
-def read_prompt(file_name) -> str:
+def read_file(file_name) -> str:
     base_dir = get_root()
     file_path = base_dir / file_name
     with open(file_path, 'r', encoding='utf-8') as file:
@@ -18,14 +18,14 @@ def read_prompt(file_name) -> str:
         return content
 
 def read_pipeline_prompt(file_name) -> str:
-    return read_prompt(file_name).format(pipeline=read_prompt("prompts/pipeline_structure.md"))
+    return read_file(file_name).format(pipeline=read_file("prompts/pipeline_structure.md"))
 
 def read_json(json_file) -> dict:
     if not json_file:
         raise ValueError("Illegal argument json file input")
     base_dir = get_root()
     file_path = base_dir / json_file
-    with open(file_path) as f:
+    with open(file_path, 'r', encoding="utf-8") as f:
         return json.load(f)
 
 def output_creation(directory: str, file_name: str, content: str):
