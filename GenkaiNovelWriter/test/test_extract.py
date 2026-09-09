@@ -1,6 +1,6 @@
 from util.gateway import connect_lm_studio, connect_openrouter
 from util.file import read_file, output_creation, read_json
-from util.env import ModelConfig
+from util.settings import ModelConfig
 from novel.engine import improving, structuring, writing, extract_tail, extract_head
 from novel.novel import NovelScene
 

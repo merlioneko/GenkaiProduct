@@ -4,13 +4,12 @@ from abc import ABC, abstractmethod
 from openai import BadRequestError
 from openai import OpenAI
 from util.tools import Tavily
+from util.settings import get_openrouter_base_url, get_required_secret
 from pydantic import BaseModel
 
 MAX_SEARCH_RESULTS = 5
 MAX_RESULT_CONTENT_LENGTH = 1000
 MAX_SEARCH_CONTEXT_LENGTH = 6000
-from util.file import read_json
-
 def create_message(history: list = [], system:str = "", user:str = "") -> list:
     message =[
         {"role": "system", "content": system},
@@ -101,10 +100,10 @@ def connect_lm_studio(model: str):
 
 class OpenRouterGateWay(OpenAiApiGateWay):
     def connect(self):
-        openrouter = read_json(".env/gateway.json")["openrouter"]
-        url = openrouter["url"]
-        api_key = openrouter["api_key"]
-        self.client = OpenAI(base_url=url, api_key=api_key)
+        self.client = OpenAI(
+            base_url=get_openrouter_base_url(),
+            api_key=get_required_secret("OPENROUTER_API_KEY"),
+        )
 
 def connect_openrouter(model: str):
     client = OpenRouterGateWay(model)
