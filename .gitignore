@@ -1,4 +1,7 @@
 GenkaiNovelWriter/model.md
 __pycache__/
+.env
 .env/
+.env.*
+!.env.example
 creations/

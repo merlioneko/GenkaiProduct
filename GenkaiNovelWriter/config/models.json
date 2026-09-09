@@ -1,0 +1,4 @@
+{
+  "writer": "nvidia/nemotron-3-super-120b-a12b:free",
+  "editor": "nvidia/nemotron-3-super-120b-a12b:free"
+}

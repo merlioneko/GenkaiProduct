@@ -3,7 +3,7 @@ from rich.console import Console
 
 from util.gateway import connect_lm_studio, connect_openrouter
 from util.file import read_file, output_creation
-from util.env import ModelConfig
+from util.settings import ModelConfig
 from novel.engine import improving, structuring, writing
 
 console = Console()

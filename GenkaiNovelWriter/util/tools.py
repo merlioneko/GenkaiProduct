@@ -1,10 +1,10 @@
 from tavily import TavilyClient
-from util.env import ToolsConfig
+from util.settings import get_required_secret
 
 class Tavily:
     def __init__(self, client: TavilyClient | None = None):
         if not client:
-            client = TavilyClient(api_key=ToolsConfig().get_search_tool()["tavily"]["api_key"])
+            client = TavilyClient(api_key=get_required_secret("TAVILY_API_KEY"))
         self.client = client
         self.tool = [
             {
