@@ -5,6 +5,8 @@ from util.file import read_pipeline_prompt
 from util.gateway import generate_text, generate_formated
 from novel.plot import Plot
 from novel.novel import NovelScene
+from novel.novel import (WritingResult, SceneWritingResult, GenerationError,
+                         BorderCheckInput, BorderCheckResult, BorderCheckReport)
 
 """
 具体的なパイプライン処理を担うモジュール
@@ -30,17 +32,27 @@ def structuring(client, improved_data):
                                     base_model=Plot)
     return cast(Plot, structured_idea)
 
-def writing(client, plot: Plot):
+def writing(client, plot: Plot, *, generate=None, prompt: str | None = None,
+            on_scene=None) -> WritingResult:
+    generate = generate or generate_text
+    if prompt is None:
+        prompt = read_pipeline_prompt("prompts/system_writing.md")
     novel = []
-    for scene in plot.Scenes:
+    for index, scene in enumerate(plot.Scenes):
         try:
-            content = generate_text(gateway=client,
-                                   system=read_pipeline_prompt("prompts/system_writing.md"),
+            content = generate(gateway=client,
+                                   system=prompt,
                                    user=f"Plot: {plot}\nあなたはこのプロットにおける、シーン「{scene.name}」の小説を書きます。")
-            novel.append(NovelScene(title=scene.name, content=content))
+            result = SceneWritingResult(scene_index=index, title=scene.name,
+                status="success", scene=NovelScene(title=scene.name, content=content))
         except Exception as e:
-            print(f"Error occurred while generating content for scene '{scene.name}': {e}")
-    return novel
+            result = SceneWritingResult(scene_index=index, title=scene.name,
+                status="failed", error=GenerationError(type=type(e).__name__, message=str(e)))
+        novel.append(result)
+        # Persistence errors must propagate, rather than look like generation failures.
+        if on_scene is not None:
+            on_scene(result)
+    return WritingResult(results=novel)
 
 def extract_tail(text: str, budget: int = 1000, window: float = 1.5) -> str:
     w = int(budget * window)
@@ -74,26 +86,38 @@ def check_border(scene_before: NovelScene, scene_after: NovelScene, budget: int 
     """
     2つのシーンの境界をチェックする。境界が不自然な場合はFalseを返す。
     """
-    tail_before = extract_tail(scene_before.content, budget=budget, window=window)
-    head_after = extract_head(scene_after.content, budget=budget, window=window)
-    # 境界が不自然な場合はFalseを返す
-    if tail_before and head_after:
-        if tail_before[-1] not in "。！？":
-            return False
-        if head_after[0] not in "「『":
-            return False
-    return True
+    result = inspect_border(BorderCheckInput(before_index=0, after_index=1,
+        tail=extract_tail(scene_before.content, budget, window),
+        head=extract_head(scene_after.content, budget, window), budget=budget, window=window))
+    return result.status == "passed"
 
-def elaboration(novel_scenes: list[NovelScene]):
-    """
-    小説の各シーンを精緻化する。境界が不自然な場合は、前後のシーンを再生成する。
-    """
-    for i in range(len(novel_scenes) - 1):
-        scene_before = novel_scenes[i]
-        scene_after = novel_scenes[i + 1]
-        if not check_border(scene_before, scene_after):
-            # 境界が不自然な場合は、前後のシーンを再生成する
-            print(f"境界が不自然なため、シーン {scene_before.title} と {scene_after.title} を再生成します。")
-            # 再生成の処理をここに追加する
-            # 例: scene_before.content = generate_text(...) など
+def inspect_border(data: BorderCheckInput) -> BorderCheckResult:
+    """Record the existing punctuation heuristic, not a semantic review."""
+    if not data.tail or not data.head:
+        return BorderCheckResult(input=data, status="not_checked",
+                                 reasons=["境界の抜粋が空です。"])
+    reasons = []
+    if data.tail[-1] not in "。！？":
+        reasons.append("前のシーンの末尾が句点・感嘆符・疑問符ではありません。")
+    if data.head[0] not in "「『":
+        reasons.append("次のシーンの冒頭が会話の括弧ではありません。")
+    return BorderCheckResult(input=data, status="failed" if reasons else "passed",
+                             reasons=reasons)
+
+
+def elaboration(novel_scenes: WritingResult, budget: int = 1000,
+                window: float = 1.5) -> BorderCheckReport:
+    """Inspect original adjacent scenes; regeneration remains a separate stage."""
+    checks = []
+    for before, after in zip(novel_scenes.results, novel_scenes.results[1:]):
+        data = BorderCheckInput(before_index=before.scene_index,
+            after_index=after.scene_index, budget=budget, window=window,
+            tail=extract_tail(before.scene.content, budget, window) if before.scene else "",
+            head=extract_head(after.scene.content, budget, window) if after.scene else "")
+        if before.status == "failed" or after.status == "failed":
+            checks.append(BorderCheckResult(input=data, status="not_checked",
+                                           reasons=["隣接するシーンの生成に失敗しています。"]))
+        else:
+            checks.append(inspect_border(data))
+    return BorderCheckReport(checks=checks)
 

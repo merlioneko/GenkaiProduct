@@ -1,5 +1,9 @@
 from pathlib import Path
 import json
+from typing import TypeVar
+from pydantic import BaseModel
+
+ModelT = TypeVar("ModelT", bound=BaseModel)
 
 """
 ファイル操作を行う簡易メソッドのモジュール
@@ -33,5 +37,14 @@ def output_creation(directory: str, file_name: str, content: str):
     directory_path = base_dir / directory
     directory_path.mkdir(parents=True, exist_ok=True)
     file_path = directory_path / file_name
+    file_path.parent.mkdir(parents=True, exist_ok=True)
     with open(file_path, 'w', encoding='utf-8') as f:
         f.write(content)
+
+
+def output_model(directory: str, file_name: str, model: BaseModel):
+    output_creation(directory, file_name, model.model_dump_json(indent=2))
+
+
+def read_model(file_name, model_type: type[ModelT]) -> ModelT:
+    return model_type.model_validate_json(read_file(file_name))

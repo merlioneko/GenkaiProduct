@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
+from pydantic import BaseModel, ConfigDict, Field
 
 from util.file import read_json
 
@@ -13,10 +14,20 @@ DEFAULT_MODEL_CONFIG = PROJECT_ROOT / "config" / "models.json"
 load_dotenv(PROJECT_ROOT / ".env")
 
 
+class ModelSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    writer: str = Field(min_length=1)
+    editor: str = Field(min_length=1)
+
+
 class ModelConfig:
     def __init__(self, config_file=DEFAULT_MODEL_CONFIG):
-        self.config_file = config_file
-        self.config_data = self.load_config()
+        self.config_file = Path(config_file)
+        self.data = ModelSettings.model_validate(self.load_config())
+        self.config_data = self.data.model_dump()
+
+    def __str__(self):
+        return self.data.model_dump_json(indent=2)
 
     def load_config(self):
         return read_json(self.config_file)
