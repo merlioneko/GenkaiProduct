@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch
 
 from pydantic import ValidationError
 
-from main import run_pipeline
+from main import main, run_pipeline
 from novel.engine import writing, elaboration, inspect_border
 from novel.novel import (NovelScene, SceneWritingResult, WritingResult,
                          BorderCheckInput, BorderCheckReport)
@@ -26,6 +26,131 @@ def sample_plot():
 
 
 class PipelineTest(unittest.TestCase):
+    def test_stage_order_artifacts_and_event_metadata(self):
+        with tempfile.TemporaryDirectory() as folder, \
+             patch("main.connect_openrouter", return_value=Mock()) as connect, \
+             patch("main.read_file", return_value="アイデア"), \
+             patch("main.improving", return_value="構想"), \
+             patch("main.structuring", return_value=sample_plot()):
+            root = Path(folder)
+            result, output = run_pipeline(
+                directory=root / "all", prompt="test",
+                generate=Mock(return_value="本文。"),
+            )
+            expected_files = {
+                "00_user_prompt.txt", "01_model_config.json",
+                "02_improved_idea.txt", "03_plot.json", "03_plot.txt",
+                "04_novel.json", "04_novel.txt", "05_borders.json", "events.jsonl",
+                *[f"scenes/scene-{i:04d}.json" for i in range(3)],
+            }
+            self.assertEqual(
+                {p.relative_to(output).as_posix() for p in output.rglob("*") if p.is_file()},
+                expected_files,
+            )
+            events = [json.loads(line) for line in
+                      (output / "events.jsonl").read_text(encoding="utf-8").splitlines()]
+            self.assertEqual([e["stage"] for e in events],
+                             ["connect", "improving", "structuring", "writing", "borders"])
+            self.assertEqual([e["artifact"] for e in events],
+                             [None, "02_improved_idea.txt", "03_plot.json",
+                              "04_novel.json", "05_borders.json"])
+            self.assertEqual(len({e["run_id"] for e in events}), 1)
+            self.assertEqual(len(events[0]["run_id"]), 32)
+            for event in events:
+                self.assertEqual(event["status"], "success")
+                self.assertGreaterEqual(event["elapsed_seconds"], 0)
+                self.assertEqual(event["model"], connect.call_args.args[0])
+                self.assertIsNone(event["error_type"])
+
+            with patch("main.ModelConfig", side_effect=AssertionError("config")):
+                restored, checked = run_pipeline(
+                    stage="borders", source=output / "04_novel.json",
+                    directory=root / "borders",
+                )
+            self.assertEqual(restored, result)
+            events = [json.loads(line) for line in
+                      (checked / "events.jsonl").read_text(encoding="utf-8").splitlines()]
+            self.assertEqual([e["stage"] for e in events], ["load_writing", "borders"])
+            self.assertTrue(all(e["model"] is None for e in events))
+            connect.assert_called_once()
+
+    def test_connection_failure_is_logged_and_reraised(self):
+        error = ConnectionError("offline")
+        with tempfile.TemporaryDirectory() as folder, \
+             patch("main.connect_openrouter", side_effect=error):
+            root = Path(folder)
+            output_model(root, "plot.json", sample_plot())
+            with self.assertRaises(ConnectionError) as raised:
+                run_pipeline(stage="writing", source=root / "plot.json",
+                             directory=root / "output")
+            self.assertIs(raised.exception, error)
+            events = [json.loads(line) for line in
+                      (root / "output/events.jsonl").read_text(encoding="utf-8").splitlines()]
+            self.assertEqual([e["stage"] for e in events], ["load_plot", "connect"])
+            self.assertEqual(events[-1]["status"], "failed")
+            self.assertEqual(events[-1]["error_type"], "ConnectionError")
+            self.assertIsNone(events[-1]["artifact"])
+
+    def test_scene_save_failure_is_logged_and_preserves_prior_scene(self):
+        error = OSError("disk")
+        real_output_model = output_model
+
+        def save(directory, name, model):
+            if name == "scenes/scene-0001.json":
+                raise error
+            real_output_model(directory, name, model)
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            output_model(root, "plot.json", sample_plot())
+            generate = Mock(return_value="本文。")
+            with patch("main.output_model", side_effect=save), \
+                 self.assertRaises(OSError) as raised:
+                run_pipeline(stage="writing", source=root / "plot.json",
+                             directory=root / "output", client=object(),
+                             generate=generate, prompt="test")
+            self.assertIs(raised.exception, error)
+            self.assertEqual(generate.call_count, 2)
+            self.assertTrue((root / "output/scenes/scene-0000.json").exists())
+            self.assertFalse((root / "output/04_novel.json").exists())
+            events = [json.loads(line) for line in
+                      (root / "output/events.jsonl").read_text(encoding="utf-8").splitlines()]
+            self.assertEqual([e["stage"] for e in events], ["load_plot", "writing"])
+            self.assertEqual(events[-1]["status"], "failed")
+            self.assertEqual(events[-1]["error_type"], "OSError")
+
+    def test_cli_validation_and_failure_exit_codes(self):
+        for arguments in [["--stage", "writing"], ["--stage", "borders"],
+                          ["--stage", "unknown"]]:
+            with self.subTest(arguments=arguments), patch("sys.stderr"), \
+                 self.assertRaises(SystemExit) as raised:
+                main(arguments)
+            self.assertEqual(raised.exception.code, 2)
+        with patch("main.run_pipeline", side_effect=OSError("disk")), \
+             patch("main.Console"):
+            self.assertEqual(main([]), 1)
+
+    def test_cli_exit_code_matches_writing_completion(self):
+        for responses, expected_code, expected_message in [
+                (["本文。"] * 3, 0, "執筆完了"),
+                (["本文。", RuntimeError("offline"), "本文。"], 1, "未生成のシーンあり")]:
+            with self.subTest(expected_code=expected_code):
+                result = writing(None, sample_plot(), prompt="test",
+                                 generate=Mock(side_effect=responses))
+                with patch("main.run_pipeline", return_value=(result, Path("output"))), \
+                     patch("main.Console") as console:
+                    self.assertEqual(main([]), expected_code)
+                    console.return_value.print.assert_called_once_with(
+                        f"{expected_message}: output")
+
+    def test_invalid_saved_plot_fails_before_connecting(self):
+        with tempfile.TemporaryDirectory() as folder, patch("main.connect_openrouter") as connect:
+            root = Path(folder)
+            with self.assertRaises(FileNotFoundError):
+                run_pipeline(stage="writing", source=root / "missing.json",
+                             directory=root / "output")
+            connect.assert_not_called()
+
     def test_roundtrip_and_rendering(self):
         result = writing(None, sample_plot(), generate=Mock(return_value="本文。\n日本語"), prompt="test")
         with tempfile.TemporaryDirectory() as folder:
