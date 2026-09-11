@@ -1,5 +1,6 @@
 openai
-pydantic
+pydantic>=2,<3
+httpx
 python-dotenv
 rich
 tavily-python

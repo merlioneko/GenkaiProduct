@@ -2,7 +2,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from util.gateway import OpenRouterGateWay
+from util.gateway import connect_openrouter
 from util.settings import ModelConfig, get_openrouter_base_url, get_required_secret
 from util.tools import Tavily
 
@@ -47,12 +47,14 @@ class SettingsTest(unittest.TestCase):
             os.environ,
             {"OPENROUTER_API_KEY": "openrouter-test-key"},
             clear=True,
-        ), patch("util.gateway.OpenAI") as openai:
-            OpenRouterGateWay("test-model").connect()
+        ), patch("openai.OpenAI") as openai:
+            connect_openrouter("test-model")
 
         openai.assert_called_once_with(
             base_url="https://openrouter.ai/api/v1",
             api_key="openrouter-test-key",
+            timeout=600,
+            max_retries=0,
         )
 
     def test_tavily_uses_environment_key(self):

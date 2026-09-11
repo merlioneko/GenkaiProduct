@@ -1,171 +1,162 @@
-import json
-from abc import ABC, abstractmethod
+"""One OpenAI-compatible client for local and remote backends (no search imports)."""
 
-from openai import BadRequestError
-from openai import OpenAI
-from util.tools import Tavily
-from util.settings import get_openrouter_base_url, get_required_secret
+import json
+from pathlib import Path
+from time import perf_counter
+
 from pydantic import BaseModel
 
-MAX_SEARCH_RESULTS = 5
-MAX_RESULT_CONTENT_LENGTH = 1000
-MAX_SEARCH_CONTEXT_LENGTH = 6000
-def create_message(history: list = [], system:str = "", user:str = "") -> list:
-    message =[
+from util.log import append_call
+
+DEFAULT_LOG = Path(__file__).resolve().parent.parent / "creations/legacy/calls.jsonl"
+
+
+def create_message(history: list | None = None, system: str = "", user: str = "") -> list:
+    return list(history or []) + [
         {"role": "system", "content": system},
-        {"role": "user", "content": user}
+        {"role": "user", "content": user},
     ]
-    if history:
-        message = history + message
-    return message
 
-class OpenAiApiGateWay(ABC):
-    def __init__(self, model):
+
+class GenerationError(RuntimeError):
+    """The response cannot be used as a completed piece of writing."""
+
+
+class OpenAICompatibleGateway:
+    def __init__(self, model: str, *, base_url: str, api_key: str,
+                 phase: str = "legacy", backend: str = "legacy", thinking: bool | None = None,
+                 request_body: dict | None = None, log_path=DEFAULT_LOG,
+                 timeout: float = 600, client=None):
         self.model = model
-        self.client = None
+        self.phase = phase
+        self.backend = backend
+        self.thinking = thinking
+        self.request_body = dict(request_body or {})
+        self.log_path = Path(log_path)
+        self.last_response = None
+        if client is None:
+            from openai import OpenAI
+            # Hidden SDK retries would hide individual requests and their costs.
+            client = OpenAI(base_url=base_url, api_key=api_key, timeout=timeout, max_retries=0)
+        self.client = client
 
-    @abstractmethod
-    def connect(self):
-        pass
+    def __enter__(self):
+        return self
 
-    def chat_response(self, message: list):
-        if self.client is None:
-            raise ValueError("Client is not connected. Please call connect() first.")
-        return self.client.chat.completions.create(
-            model=self.model,
-            messages=message
-        )
+    def __exit__(self, *args):
+        self.client.close()
+
+    def _request(self, messages: list, *, response_schema=None, base_model=None):
+        started = perf_counter()
+        response = None
+        self.last_response = None
+        error_type = None
+        error_usage = {}
+        try:
+            arguments = dict(model=self.model, messages=messages, stream=False)
+            if self.request_body:
+                arguments["extra_body"] = self.request_body
+            if response_schema is not None:
+                arguments["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {"name": "Plot" if base_model is None else base_model.__name__,
+                                    "strict": True, "schema": response_schema},
+                }
+            response = self.client.chat.completions.create(**arguments)
+            self.last_response = response
+            if not response.choices:
+                raise GenerationError("Response has no choices.")
+            choice = response.choices[0]
+            if choice.finish_reason != "stop":
+                raise GenerationError("Generation did not finish normally.")
+            if not isinstance(choice.message.content, str) or not choice.message.content.strip():
+                raise GenerationError("Response has no text content.")
+            if base_model is not None:
+                return base_model.model_validate_json(choice.message.content)
+            return response
+        except BaseException as error:
+            error_type = type(error).__name__
+            # Only numeric usage metadata; never log raw errors, headers or bodies.
+            body = getattr(error, "body", None)
+            if isinstance(body, dict):
+                error_usage = body.get("usage", {})
+                if not isinstance(error_usage, dict):
+                    error_usage = {}
+            if not error_usage and getattr(error, "response", None) is not None:
+                try:
+                    payload = error.response.json()
+                    if isinstance(payload, dict) and isinstance(payload.get("usage"), dict):
+                        error_usage = payload["usage"]
+                except (ValueError, TypeError):
+                    pass
+            raise
+        finally:
+            elapsed = perf_counter() - started
+            usage = getattr(response, "usage", None)
+            def tokens(name):
+                value = getattr(usage, name, None) if usage else error_usage.get(name)
+                return value if isinstance(value, int) and not isinstance(value, bool) else None
+            output_tokens = tokens("completion_tokens")
+            stats = getattr(response, "stats", None)
+            append_call(self.log_path, {
+                "phase": self.phase, "backend": self.backend,
+                "model": self.model, "thinking": self.thinking,
+                "thinking_request_supplied": bool(self.request_body),
+                "input_tokens": tokens("prompt_tokens"), "output_tokens": output_tokens,
+                "total_tokens": tokens("total_tokens"), "duration_seconds": elapsed,
+                "output_tokens_per_second_end_to_end": (
+                    output_tokens / elapsed if output_tokens is not None and elapsed > 0 else None
+                ),
+                "server_tokens_per_second": (
+                    stats.get("tokens_per_second") if isinstance(stats, dict) else None
+                ),
+                "status": "error" if error_type else "success", "error_type": error_type,
+            })
+
+    def chat_response(self, message: list, *, response_schema=None):
+        return self._request(message, response_schema=response_schema)
+
+    def chat(self, messages: list):
+        return self.chat_response(messages)
+
+    def text(self, messages: list) -> str:
+        return self.chat_response(messages).choices[0].message.content
 
     def chat_formated(self, message: list, base_model: type[BaseModel]) -> BaseModel:
-        if self.client is None:
-            raise ValueError("Client is not connected. Please call connect() first.")
-
-        response = self.client.chat.completions.parse(
-            model=self.model,
-            messages=message,
-            response_format=base_model
-        )
-        if response.choices[0].message.parsed:
-            return response.choices[0].message.parsed
-        else:
-            raise ValueError("Failed to parse the response.")
-
-    def chat(self, messages):
-        if self.client is None:
-            raise ValueError("Client is not connected. Please call connect() first.")
-        try:
-            return self.client.chat.completions.create(
-                model=self.model,
-                messages=messages
-            )
-        except BadRequestError as error:
-            if "exceed_context_size_error" in str(error):
-                raise RuntimeError(
-                    "検索結果を含む入力がモデルのコンテキスト上限を超えました。"
-                    "検索結果の件数または本文の長さを減らすか、LM Studio のコンテキスト長を増やしてください。"
-                ) from error
-            raise
-
-    def chat_with_tool(self, system, user, tool):
-        if self.client is None:
-            raise ValueError("Client is not connected. Please call connect() first.")
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user}
-            ],
-            tools=tool,
-            tool_choice="required"
-        )
-        return response.choices[0].message
+        return self._request(message, response_schema=base_model.model_json_schema(), base_model=base_model)
 
 
-class LmStudioGateway(OpenAiApiGateWay):
-    def connect(self, url="http://localhost:1234/v1", api_key="lm-studio"):
-        self.client = OpenAI(base_url=url, api_key=api_key)
-
+# Existing experimental scripts keep their helpers, but use the same client class.
+# No connection-test generation is performed implicitly.
 def connect_lm_studio(model: str):
-    client = LmStudioGateway(model)
-    try:
-        client.connect()
-        result = client.chat_response(
-            create_message(system="This session is Test mode. Don't Thinking.", user="Only say Ok")
-            ).choices[0].message.content
-        if not result:
-            raise ConnectionError(f"Failed to connect to the API: Unexpected response from the server. Expected 'Ok', got '{result}'")
-    except Exception as e:
-        raise ConnectionError(f"Failed to connect to the API: {e}")
-    return client
+    return OpenAICompatibleGateway(model, base_url="http://localhost:1234/v1", api_key="lm-studio")
 
-class OpenRouterGateWay(OpenAiApiGateWay):
-    def connect(self):
-        self.client = OpenAI(
-            base_url=get_openrouter_base_url(),
-            api_key=get_required_secret("OPENROUTER_API_KEY"),
-        )
 
 def connect_openrouter(model: str):
-    client = OpenRouterGateWay(model)
-    try:
-        client.connect()
-        result = client.chat_response(
-            create_message(system="This session is Test mode. Don't Thinking.", user="Only say Ok")
-            ).choices[0].message.content
-        if not result:
-            raise ConnectionError(f"Failed to connect to the API: Unexpected response from the server. Expected 'Ok', got '{result}'")
-    except Exception as e:
-        raise ConnectionError(f"Failed to connect to the API: {e}")
-    return client
+    from util.settings import get_openrouter_base_url, get_required_secret
+    return OpenAICompatibleGateway(model, base_url=get_openrouter_base_url(),
+                                   api_key=get_required_secret("OPENROUTER_API_KEY"))
 
-def generate_text(gateway, system: str, user: str, history:list = []) -> str:
-    if gateway.client is None:
-        raise ValueError("Client is not connected. Please call connect() first.")
-    print(f"System: {system}\nUser: {user}")
-    response = gateway.chat_response(
-        create_message(history=history, system=system, user=user)
-        )
-    result = response.choices[0].message.content
-    return result
 
-def generate_formated(gateway, system: str, user: str, base_model: type[BaseModel], history:list = []) -> BaseModel:
-    if gateway.client is None:
-        raise ValueError("Client is not connected. Please call connect() first.")
-    response = gateway.chat_formated(
-        create_message(history=history, system=system, user=user),
-        base_model=base_model
-        )
-    return response
+def generate_text(gateway, system: str, user: str, history: list | None = None) -> str:
+    return gateway.text(create_message(history=history, system=system, user=user))
+
+
+def generate_formated(gateway, system: str, user: str, base_model: type[BaseModel],
+                      history: list | None = None) -> BaseModel:
+    return gateway.chat_formated(create_message(history=history, system=system, user=user), base_model)
+
 
 def _compact_search_result(result) -> str:
     if not isinstance(result, dict):
-        return json.dumps(result, ensure_ascii=False)[:MAX_SEARCH_CONTEXT_LENGTH]
-
-    compact_results = []
-    for item in result.get("results", [])[:MAX_SEARCH_RESULTS]:
-        if not isinstance(item, dict):
-            continue
-        compact_results.append({
-            "title": item.get("title", ""),
-            "content": str(item.get("content", ""))[:MAX_RESULT_CONTENT_LENGTH],
-            "url": item.get("url", ""),
-        })
-
-    return json.dumps(
-        {"results": compact_results},
-        ensure_ascii=False,
-    )[:MAX_SEARCH_CONTEXT_LENGTH]
+        return json.dumps(result, ensure_ascii=False)[:6000]
+    results = [{"title": item.get("title", ""), "content": str(item.get("content", ""))[:1000],
+                "url": item.get("url", "")}
+               for item in result.get("results", [])[:5] if isinstance(item, dict)]
+    return json.dumps({"results": results}, ensure_ascii=False)[:6000]
 
 
-def generate_with_search(gateway: OpenAiApiGateWay, system, user, search_tool: Tavily):
-    result = search_tool.execute(user)
-    messages = [
-        {"role": "system", "content": system},
-        {"role": "user", "content": user},
-        {
-            "role": "user",
-            "content": "検索結果:\n" + _compact_search_result(result),
-        },
-    ]
-    response = gateway.chat(messages)
-    return response.choices[0].message.content
+def generate_with_search(gateway, system, user, search_tool):
+    messages = create_message(system=system, user=user)
+    messages.append({"role": "user", "content": "検索結果:\n" + _compact_search_result(search_tool.execute(user))})
+    return gateway.text(messages)

@@ -1,0 +1,26 @@
+{
+  "local": {
+    "base_url": "http://localhost:1234/v1",
+    "api_key": "lm-studio",
+    "context_length": 16384,
+    "phases": {
+      "concept": {"model": "qwen3.6-35b-a3b", "thinking": true},
+      "structure": {"model": "qwen3.6-35b-a3b", "thinking": true},
+      "writing": {"model": "gemma-4-26b-a4b", "thinking": false},
+      "check": {"model": "qwen3.6-35b-a3b", "thinking": true},
+      "baseline": {"model": "gemma-4-26b-a4b", "thinking": false}
+    }
+  },
+  "remote": {
+    "base_url": "https://openrouter.ai/api/v1",
+    "api_key": "",
+    "context_length": 16384,
+    "phases": {
+      "concept": {"model": "REPLACE_WITH_MODEL_ID", "thinking": true},
+      "structure": {"model": "REPLACE_WITH_MODEL_ID", "thinking": true},
+      "writing": {"model": "REPLACE_WITH_MODEL_ID", "thinking": false},
+      "check": {"model": "REPLACE_WITH_MODEL_ID", "thinking": true},
+      "baseline": {"model": "REPLACE_WITH_MODEL_ID", "thinking": false}
+    }
+  }
+}
