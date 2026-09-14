@@ -3,8 +3,9 @@ import re
 
 from util.file import read_pipeline_prompt
 from util.gateway import generate_text, generate_formated
-from novel.plot import Plot
-from novel.novel import NovelScene
+from novel.datamodels.plot import Plot
+from novel.datamodels.novel import NovelScene
+from novel.datamodels.concept import Concept
 
 """
 具体的なパイプライン処理を担うモジュール
@@ -14,29 +15,32 @@ TODO: 【要相談】設定において、パースに失敗したらどうす�
 TODO: engineという名前が大げさすぎた説がある
 """
 
-def improving(client, user_idea):
+def generate_concept(client, user_idea):
     """
-    アイデアを膨らませて構想を作成する。ここはまだ平文
+    アイデアを膨らませて構想を作成する。
+    Returns:
+        Concept: 構想化データモデル
     """
-    improved_idea = generate_text(gateway=client,
+    improved_idea = generate_formated(gateway=client,
                                 system=read_pipeline_prompt("prompts/system_improving.md"),
-                                user=user_idea)
+                                user=user_idea,
+                                base_model=Concept)
     return improved_idea
 
-def structuring(client, improved_data):
+def generate_plot(client, improved_data):
     structured_idea = generate_formated(gateway=client,
                                     system=read_pipeline_prompt("prompts/system_structuring.md"),
                                     user=improved_data,
                                     base_model=Plot)
     return cast(Plot, structured_idea)
 
-def writing(client, plot: Plot):
+def generate_novel(client, plot: Plot):
     novel = []
     for scene in plot.Scenes:
         try:
             content = generate_text(gateway=client,
                                    system=read_pipeline_prompt("prompts/system_writing.md"),
-                                   user=f"Plot: {plot}\nあなたはこのプロットにおける、シーン「{scene.name}」の小説を書きます。")
+                                   user=f"# Plot\n{plot}\nこのPlotにおける、シーン「{scene.name}」の小説を書いてください。")
             novel.append(NovelScene(title=scene.name, content=content))
         except Exception as e:
             print(f"Error occurred while generating content for scene '{scene.name}': {e}")

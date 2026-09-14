@@ -1,4 +1,4 @@
-from util.gateway import connect_lm_studio, generate_text, generate_with_search, connect_openrouter
+from util.gateway import connect_lm_studio, generate_text, connect_openrouter
 from util.file import read_file, read_pipeline_prompt
 from util.tools import Tavily
 from util.settings import ModelConfig

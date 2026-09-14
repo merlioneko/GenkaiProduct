@@ -1,8 +1,8 @@
 from util.gateway import connect_lm_studio, connect_openrouter
 from util.file import read_file, output_creation, read_json
 from util.settings import ModelConfig
-from novel.engine import improving, structuring, writing, extract_tail, extract_head
-from novel.novel import NovelScene
+from novel.engine import generate_concept, generate_plot, generate_novel, extract_tail, extract_head
+from GenkaiNovelWriter.novel.datamodels.novel import NovelScene
 
 # Writingが終わりました～～という体
 contents = []

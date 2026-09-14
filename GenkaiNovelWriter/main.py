@@ -4,7 +4,7 @@ from rich.console import Console
 from util.gateway import connect_lm_studio, connect_openrouter
 from util.file import read_file, output_creation
 from util.settings import ModelConfig
-from novel.engine import improving, structuring, writing
+from novel.engine import generate_concept, generate_plot, generate_novel
 
 console = Console()
 
@@ -25,17 +25,17 @@ try:
     console.print("[red]接続成功: OpenAI APIに接続しました。[/red]")
     #input("Enterを押すと処理を開始します。")
 
-    improved_idea = improving(client, user_idea)
+    improved_idea = generate_concept(client, user_idea)
     output_creation(directory_path, "02_improved_idea.txt", improved_idea)
     console.print("[green]改善されたアイデア:[/green]", improved_idea)
     #input("Enterを押すと処理を開始します。")
 
-    plot = structuring(client, improved_idea)
+    plot = generate_plot(client, improved_idea)
     output_creation(directory_path, "03_plot.txt", str(plot))
     console.print("[green]構造化されたアイデア:[/green]", plot)
     #input("Enterを押すと処理を開始します。")
 
-    novel = writing(client, plot)
+    novel = generate_novel(client, plot)
     output_creation(directory_path, "04_novel.txt", "\n\n".join([str(scene) for scene in novel]))
 
     console.print("[green]生成された小説:[/green]", novel)
