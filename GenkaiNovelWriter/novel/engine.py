@@ -2,7 +2,7 @@ from typing import cast
 import re
 
 from util.file import read_pipeline_prompt
-from util.gateway import generate_text, generate_formated
+from util.gateway import generate_text, generate_formatted
 from novel.datamodels.plot import Plot
 from novel.datamodels.novel import NovelScene
 from novel.datamodels.concept import Concept
@@ -15,24 +15,24 @@ TODO: 【要相談】設定において、パースに失敗したらどうす�
 TODO: engineという名前が大げさすぎた説がある
 """
 
-def generate_concept(client, user_idea):
+def generate_concept(client, user_idea) -> Concept:
     """
     アイデアを膨らませて構想を作成する。
     Returns:
         Concept: 構想化データモデル
     """
-    improved_idea = generate_formated(gateway=client,
+    improved_idea = generate_formatted(gateway=client,
                                 system=read_pipeline_prompt("prompts/system_improving.md"),
                                 user=user_idea,
                                 base_model=Concept)
     return improved_idea
 
 def generate_plot(client, improved_data):
-    structured_idea = generate_formated(gateway=client,
+    structured_idea = generate_formatted(gateway=client,
                                     system=read_pipeline_prompt("prompts/system_structuring.md"),
                                     user=improved_data,
                                     base_model=Plot)
-    return cast(Plot, structured_idea)
+    return structured_idea
 
 def generate_novel(client, plot: Plot):
     novel = []

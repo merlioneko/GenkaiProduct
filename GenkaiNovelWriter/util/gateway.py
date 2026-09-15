@@ -5,6 +5,9 @@ from openai import BadRequestError
 from openai import OpenAI
 from util.settings import get_openrouter_base_url, get_required_secret
 from pydantic import BaseModel
+from typing import TypeVar
+
+BaseModelT = TypeVar("BaseModelT", bound=BaseModel)
 
 def create_message(history: list = [], system:str = "", user:str = "") -> list:
     message =[
@@ -28,7 +31,7 @@ class OpenAiApiGateWay(ABC):
             messages=message
         )
 
-    def chat_formatted(self, message: list, response_format: type[BaseModel]) -> BaseModel:
+    def chat_formatted(self, message: list, response_format: type[BaseModelT]) -> BaseModelT:
         if self.client is None:
             raise ValueError("Client is not connected. Please call connect() first.")
 
@@ -90,10 +93,11 @@ def generate_text(gateway, system: str, user: str, history:list = []) -> str:
     result = response.choices[0].message.content
     return result
 
-def generate_formated(gateway, system: str, user: str, base_model: type[BaseModel], history:list = []) -> BaseModel:
+
+def generate_formatted(gateway, system: str, user: str, base_model: type[BaseModelT], history: list = []) -> BaseModelT:
     if gateway.client is None:
         raise ValueError("Client is not connected. Please call connect() first.")
-    response = gateway.chat_formated(
+    response = gateway.chat_formatted(
         create_message(history=history, system=system, user=user),
         base_model=base_model
         )
