@@ -1,4 +1,6 @@
-"""M1 のローカル実機検証(U2/U3/U4/U7)。ユーザが実行する。観測結果を SPEC に自動反映はしない。"""
+"""M1 のローカル実機検証(U2/U3/U4/U7)。ユーザが実行する。観測結果を SPEC に自動反映はしない。
+
+U3 の Plot スキーマは novel/schema.py の本物を使う。"""
 
 import argparse
 import json
@@ -13,7 +15,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from main import baseline, create_output_dir
-from test.plot_schema import Plot
+from novel.schema import Plot
 from util.config import DEFAULT_CONFIG, ConfigError, load_backend, load_thinking_options, thinking_body
 from util.gateway import OpenAICompatibleGateway, create_message
 

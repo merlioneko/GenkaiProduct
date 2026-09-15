@@ -6,6 +6,7 @@ LM Studio と OpenRouter の差は base_url / api_key / model だけなので、
 
 from pathlib import Path
 from time import perf_counter
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -70,7 +71,7 @@ class OpenAICompatibleGateway:
         error_type = None
         error_usage = {}
         try:
-            arguments = dict(model=self.model, messages=messages, stream=False)
+            arguments: dict[str, Any] = {"model": self.model, "messages": messages, "stream": False}
             if self.request_body:
                 arguments["extra_body"] = self.request_body
             if response_schema is not None:
@@ -97,9 +98,10 @@ class OpenAICompatibleGateway:
             body = getattr(error, "body", None)
             if isinstance(body, dict) and isinstance(body.get("usage"), dict):
                 error_usage = body["usage"]
-            if not error_usage and getattr(error, "response", None) is not None:
+            error_response = getattr(error, "response", None)
+            if not error_usage and error_response is not None:
                 try:
-                    payload = error.response.json()
+                    payload = error_response.json()
                     if isinstance(payload, dict) and isinstance(payload.get("usage"), dict):
                         error_usage = payload["usage"]
                 except (ValueError, TypeError):
