@@ -16,7 +16,7 @@ from pydantic import ValidationError
 
 from main import baseline, main
 from test import verify_backend
-from test.plot_schema import Plot
+from novel.schema import Plot
 from test.verify_backend import run_probes
 from util.config import ConfigError, PROJECT_ROOT, load_backend, load_thinking_options, thinking_body
 from util.gateway import GenerationError, OpenAICompatibleGateway, create_message
