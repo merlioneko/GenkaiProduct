@@ -20,6 +20,8 @@ CONCEPT = "02_concept.md"
 CONCEPT_REPORT = "02_concept_report.json"
 PLOT = "03_plot.json"
 PLOT_REPORT = "03_plot_report.json"
+# スキーマに適合しなかったときの生出力(SPEC.md「Structure」)。成功時は作られない。
+PLOT_RAW = "03_plot_raw.txt"
 SCENES = "04_scenes"
 DRAFT = "05_draft.md"
 CHECK = "06_check"
@@ -29,8 +31,8 @@ ARCHIVE = "_archive"
 
 # SPEC.md「退避」の表。キーは実行したステージ、値はそのステージが退避する下流の成果物。
 DOWNSTREAM = {
-    "concept": [CONCEPT, CONCEPT_REPORT, PLOT, PLOT_REPORT, SCENES, DRAFT, CHECK, CHECK_REPORT],
-    "structure": [PLOT, PLOT_REPORT, SCENES, DRAFT, CHECK, CHECK_REPORT],
+    "concept": [CONCEPT, CONCEPT_REPORT, PLOT, PLOT_REPORT, PLOT_RAW, SCENES, DRAFT, CHECK, CHECK_REPORT],
+    "structure": [PLOT, PLOT_REPORT, PLOT_RAW, SCENES, DRAFT, CHECK, CHECK_REPORT],
     "writing": [SCENES, DRAFT, CHECK, CHECK_REPORT],
     "check": [CHECK, CHECK_REPORT],
 }
