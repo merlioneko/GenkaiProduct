@@ -93,10 +93,12 @@ def run_probes(config, options, directory, idea, checks, *, timeout=600,
         save_json(directory / "verification.json", report)
 
     def invoke(label, phase, prompt, schema=None, require_thinking=False):
+        print(f"[試行] 開始: {label} (model={phase.model})", flush=True)
         try:
             body = thinking_body(options, phase)
         except ConfigError:
             if require_thinking:
+                print(f"[試行] 未実行: {label} (thinking options missing or invalid)", flush=True)
                 return {"status": "not_run", "reason": "thinking options missing or invalid"}, None
             body = {}
         with gateway_factory(model=phase.model, base_url=config.base_url,
@@ -108,6 +110,7 @@ def run_probes(config, options, directory, idea, checks, *, timeout=600,
                     system="指示に回答してください。", user=prompt), response_schema=schema)
                 observation = thinking_observation(response)
                 save_json(directory / f"{label}.json", observation)
+                print(f"[試行] 完了: {label}", flush=True)
                 return {"status": "observed", "artifact": f"{label}.json",
                         "thinking_request_supplied": bool(body),
                         "content_has_thinking_tag": observation["content_has_thinking_tag"],
@@ -116,6 +119,7 @@ def run_probes(config, options, directory, idea, checks, *, timeout=600,
                 response = gateway.last_response
                 if response is not None and response.choices:
                     save_json(directory / f"{label}.json", thinking_observation(response))
+                print(f"[試行] 失敗: {label} ({type(error).__name__})", flush=True)
                 return {"status": "error", "error_type": type(error).__name__}, None
 
     persist()
@@ -135,6 +139,7 @@ def run_probes(config, options, directory, idea, checks, *, timeout=600,
         phase = config.phase("structure")
         for index in range(1, 11):
             label = f"schema-{index:02d}"
+            print(f"[試行] U3 {index}/10", flush=True)
             item, response = invoke(label, phase,
                                     "次のアイデアを1話完結のPlotとしてJSON Schemaに従って構造化してください。"
                                     "constraints にはジャンルや属性を、events にはユーザ入力の出来事を入力の順序どおりに列挙してください。\n" + idea,
@@ -149,6 +154,9 @@ def run_probes(config, options, directory, idea, checks, *, timeout=600,
                 except ValueError:
                     report["U3"]["schema_violations"] += 1
             persist()
+            print(f"[試行] U3 累計: {report['U3']['attempts']}/10 "
+                  f"(valid={report['U3']['valid']}, schema_violations={report['U3']['schema_violations']}, "
+                  f"api_errors={report['U3']['api_errors']})", flush=True)
         report["U3"]["status"] = "measured"
 
     if "switching" in checks:
@@ -194,6 +202,7 @@ def main(argv=None):
             report["baselines"] = []
             for name in ("concrete_01.txt", "vague_01.txt"):
                 for index in range(2):
+                    print(f"[試行] baseline {name}: {index + 1}/2", flush=True)
                     try:
                         result = baseline(PROJECT_ROOT / "prompts/tests" / name, config_path=args.config,
                                           thinking_options=args.thinking_options, timeout=args.timeout)
@@ -203,7 +212,7 @@ def main(argv=None):
                     report["baselines"].append(item)
                     save_json(directory / "verification.json", report)
         print(directory)
-        print("U2/U4 は人手確認が必要です。SPEC.md は実測結果の確認後に更新してください。")
+        print("思考モードの分離とモデルの解放は人手確認が必要(D37/D39 の再確認)。SPEC.md は確認後に手で更新する。")
         failed = any(item.get("status") in ("error", "not_run")
                      for key in ("U2", "U4") for item in report[key]["observations"])
         failed = failed or bool(report["U3"]["api_errors"] or report["U3"]["schema_violations"])
