@@ -128,3 +128,17 @@ class ConceptReport(BaseModel):
     """00_input.txt と 02_concept.md の照合結果(02_concept_report.json)。"""
     model_config = ConfigDict(extra="forbid", strict=True)
     findings: list[ConceptFinding] = Field(description="問題が無ければ空リスト")
+
+
+class PlotFinding(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    check: Literal["undecided", "unused", "place", "uncovered", "covers", "order"] = Field(
+        description="SPEC.md「Plot機械検査」の検査名。covers は存在しない出来事番号を指した場合")
+    location: str = Field(description="03_plot.json 内の位置。例: scenes[2].beats[0]")
+    detail: str = Field(description="何が見つかったかの説明")
+
+
+class PlotReport(BaseModel):
+    """Plot の機械検査の結果(03_plot_report.json)。LLM は使わない(D20)。"""
+    model_config = ConfigDict(extra="forbid", strict=True)
+    findings: list[PlotFinding] = Field(description="問題が無ければ空リスト")
