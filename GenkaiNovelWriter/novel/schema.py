@@ -110,3 +110,21 @@ class CheckResult(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     item: str = Field(description="検査項目名。contamination / length / elements / consistency / physical")
     issues: list[CheckIssue] = Field(default_factory=list)
+
+
+# ---- 照合・機械検査のレポート ----
+# SPEC は 02_concept_report.json の内容を「欠落・順序変更・意味の弱化」としか定めていない。
+# フィールドはここで決める。どちらのレポートも報告のみで、パイプラインは止めない(D18 と同じ扱い)。
+
+class ConceptFinding(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    kind: Literal["missing", "reordered", "weakened"] = Field(
+        description="missing=指定要素が構想に無い, reordered=出来事の順序が入力と違う, weakened=指定語の意味が弱められている")
+    element: str = Field(description="対象の指定要素。ユーザ入力での表現をそのまま引く")
+    detail: str = Field(description="何がどう違うかの説明。構想側の該当箇所を引用する")
+
+
+class ConceptReport(BaseModel):
+    """00_input.txt と 02_concept.md の照合結果(02_concept_report.json)。"""
+    model_config = ConfigDict(extra="forbid", strict=True)
+    findings: list[ConceptFinding] = Field(description="問題が無ければ空リスト")

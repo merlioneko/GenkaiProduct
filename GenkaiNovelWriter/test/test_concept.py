@@ -7,7 +7,7 @@ from pathlib import Path
 
 from novel import run
 from novel.phases import concept as phase
-from novel.schema import Concept
+from novel.schema import Concept, ConceptFinding, ConceptReport
 from util.config import PROJECT_ROOT, load_backend
 
 SAMPLE = """# 制約
@@ -44,10 +44,16 @@ class FakeGateway:
         FakeGateway.calls.append({"messages": messages, "kwargs": self.kwargs})
         return self.text_to_return
 
+    def parse(self, messages, model_cls):
+        FakeGateway.calls.append({"messages": messages, "kwargs": self.kwargs, "model_cls": model_cls})
+        return self.parsed
 
-def gateway_returning(text):
+
+def gateway_returning(text="", parsed=None):
     def factory(**kwargs):
-        return FakeGateway(text, **kwargs)
+        gateway = FakeGateway(text, **kwargs)
+        gateway.parsed = parsed
+        return gateway
     return factory
 
 
@@ -88,7 +94,9 @@ class ConceptFormatTest(unittest.TestCase):
             phase.parse_concept("# 制約\n- a\n\n# 出来事\n1. a\n\n# 構想\n\n")
 
 
-class ConceptPhaseTest(unittest.TestCase):
+class PhaseFixture(unittest.TestCase):
+    """実行ディレクトリと設定を用意するだけの土台。テストは持たない。"""
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -102,6 +110,8 @@ class ConceptPhaseTest(unittest.TestCase):
         self.config = load_backend(config_path)
         FakeGateway.calls = []
 
+
+class ConceptPhaseTest(PhaseFixture):
     def test_writes_the_concept_file_and_returns_the_parsed_model(self):
         result = phase.run_concept(self.directory, self.config,
                                    gateway_factory=gateway_returning(SAMPLE))
@@ -139,3 +149,38 @@ class ConceptPhaseTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ConceptVerifyTest(PhaseFixture):
+    def setUp(self):
+        super().setUp()
+        phase.run_concept(self.directory, self.config, gateway_factory=gateway_returning(SAMPLE))
+        FakeGateway.calls = []
+
+    def test_writes_the_report_and_does_not_stop_on_findings(self):
+        finding = {"kind": "weakened", "element": "最悪の魔人",
+                   "detail": "構想では「気のいい同居人」になっている"}
+        report = ConceptReport(findings=[ConceptFinding(**finding)])
+        result = phase.verify_concept(self.directory, self.config,
+                                      gateway_factory=gateway_returning(parsed=report))
+        self.assertEqual(result, report)
+        saved = json.loads((self.directory / run.CONCEPT_REPORT).read_text(encoding="utf-8"))
+        self.assertEqual(saved, {"findings": [finding]})
+
+    def test_compares_the_input_against_the_concept_file(self):
+        phase.verify_concept(self.directory, self.config,
+                             gateway_factory=gateway_returning(parsed=ConceptReport(findings=[])))
+        call = FakeGateway.calls[0]
+        self.assertEqual(call["messages"][0]["content"], phase.VERIFY_PROMPT.read_text(encoding="utf-8"))
+        self.assertIn("不良少女と魔人が報復をする話", call["messages"][1]["content"])
+        self.assertIn("魔人は「最悪の魔人」である", call["messages"][1]["content"])
+        self.assertIs(call["model_cls"], ConceptReport)
+        # 照合は Concept と同じモデルだが、ログ上は別フェーズとして数える。
+        self.assertEqual(call["kwargs"]["phase"], "concept_verify")
+        self.assertEqual(call["kwargs"]["model"], self.config.phase("concept").model)
+
+    def test_an_empty_report_is_still_written(self):
+        phase.verify_concept(self.directory, self.config,
+                             gateway_factory=gateway_returning(parsed=ConceptReport(findings=[])))
+        saved = json.loads((self.directory / run.CONCEPT_REPORT).read_text(encoding="utf-8"))
+        self.assertEqual(saved["findings"], [])

@@ -5,14 +5,16 @@ LLM にもこの形式で書かせ、書かれたものをパースして Concep
 決定的に行える。パースできない場合は修復せず停止する(D24)。人が直して再実行する。
 """
 
+import json
 from pathlib import Path
 
 from novel import run
-from novel.schema import Concept
+from novel.schema import Concept, ConceptReport
 from util.config import PROJECT_ROOT, BackendConfig, load_thinking_options, thinking_body
 from util.gateway import OpenAICompatibleGateway, create_message
 
 SYSTEM_PROMPT = PROJECT_ROOT / "prompts/concept/system.md"
+VERIFY_PROMPT = PROJECT_ROOT / "prompts/concept/verify.md"
 
 # SPEC.md「02_concept.md フォーマット」の固定見出し。
 CONSTRAINTS_HEADING = "# 制約"
@@ -75,6 +77,39 @@ def run_concept(directory: Path | str, config: BackendConfig, *, backend: str = 
 
     (directory / run.CONCEPT).write_text(text.strip() + "\n", encoding="utf-8")
     return parse_concept(text)
+
+
+def verify_concept(directory: Path | str, config: BackendConfig, *, backend: str = "local",
+                   thinking_options=None, timeout: float = 600,
+                   gateway_factory=OpenAICompatibleGateway) -> ConceptReport:
+    """00_input.txt と 02_concept.md を照合し、02_concept_report.json を書く。
+
+    報告のみで処理は止めない(SPEC.md「Concept」)。照合には Concept と同じモデルを使う。
+    """
+    directory = run.open_run(directory)
+    idea = run.read_input(directory)
+    concept_text = (directory / run.CONCEPT).read_text(encoding="utf-8")
+    phase = config.phase("concept")
+    body = thinking_body(load_thinking_options(thinking_options), phase)
+    system = VERIFY_PROMPT.read_text(encoding="utf-8")
+    user = f"""# ユーザ入力
+
+{idea}
+
+# 生成された構想
+
+{concept_text}"""
+
+    with gateway_factory(
+        model=phase.model, base_url=config.base_url, api_key=config.api_key.get_secret_value(),
+        phase="concept_verify", backend=backend, thinking=phase.thinking, request_body=body,
+        log_path=directory / run.CALLS, timeout=timeout,
+    ) as gateway:
+        report = gateway.parse(create_message(system=system, user=user), ConceptReport)
+
+    (directory / run.CONCEPT_REPORT).write_text(
+        json.dumps(report.model_dump(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return report
 
 
 # ---- パーサの内部 ----
