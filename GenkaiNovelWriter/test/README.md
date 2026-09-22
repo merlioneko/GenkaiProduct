@@ -66,3 +66,26 @@ python -m venv .venv
 ## 7. 実測後の記録
 
 観測結果は `SPEC.md` の「M1 実機検証の記録」に書く。そこで確定できたものは未確定事項の表から消し、確定事項に D番号で移す。U2/U3/U4 は 2026-09-18 に D37/D38/D39 として確定済み。U7 は M5 まで未確定なので、速度は参考値として追記する。モデル名・量子化・コンテキスト長・LM Studio のバージョン・使用した思考パラメータも残す。プログラムが SPEC を自動更新することはない。
+
+## 8. M2 の実行(Concept・Structure)
+
+LM Studio を起動し、`.env/backends.json` の `concept` / `structure` に Qwen を割り当てた状態で実行する。
+
+```powershell
+.\.venv\Scripts\python.exe main.py stage concept --input prompts/tests/concrete_01.txt
+.\.venv\Scripts\python.exe main.py stage structure --run creations/<日時>
+```
+
+`stage concept` は `--input` で新しい実行ディレクトリを作り、`--run` は既存のディレクトリに対して実行する。どちらか一方を指定する。`stage structure` は `--run` のみ。
+
+出力は `creations/<日時>/` に `00_input.txt`・`01_config.json`・`02_concept.md`・`02_concept_report.json`・`03_plot.json`・`03_plot_report.json`・`calls.jsonl`。
+
+確認すること(MILESTONES.md の M2 完了条件)。
+
+- `concrete_01.txt` と `vague_01.txt` の両方で、2つの stage が最後まで通る。
+- `concrete_01.txt` の `02_concept.md` の「# 制約」にジャンル(ドタバタラブコメ)が、「# 出来事」に「魔人到着 → 自力で再起 → 攻撃を受けて気絶」の順序が含まれている。
+- `02_concept.md` を手で編集してから `stage structure` を再実行すると、編集内容が `03_plot.json` に反映され、旧成果物が `_archive/<日時>/` に退避される。
+- `03_plot.json` を手で壊してから `stage structure` を再実行すると、パースエラーで停止する(退避された旧 Plot は `_archive/` に残る)。
+- `03_plot_report.json` が、意図的に仕込んだ未使用キャラ・未定義の場所・「または」・出来事の順序違反を検出する。`03_plot.json` を手で書き換えてから、機械検査だけを呼び出して確かめる。
+
+`02_concept.md` の形式が崩れていた場合は、ファイルを残したままエラーで停止する。手で直してから `stage structure` に進める。`03_plot.json` がスキーマに適合しなかった場合は、3回試したあと最後の生出力が `03_plot_raw.txt` に残る。
