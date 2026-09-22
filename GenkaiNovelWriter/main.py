@@ -6,28 +6,14 @@
 
 import argparse
 import sys
-from datetime import datetime
 from pathlib import Path
 
+from novel.run import CREATIONS, create_output_dir
 from util.config import (
     DEFAULT_CONFIG, PROJECT_ROOT, ConfigError, load_backend,
     load_thinking_options, thinking_body,
 )
 from util.gateway import OpenAICompatibleGateway, create_message
-
-
-def create_output_dir(root: Path, prefix: str) -> Path:
-    """creations/<prefix><時刻>/ を作る。同じ秒に作られた場合は連番を付ける。"""
-    root.mkdir(parents=True, exist_ok=True)
-    stem = prefix + datetime.now().strftime("%Y%m%d-%H%M%S")
-    for suffix in range(10000):
-        path = root / (stem if suffix == 0 else f"{stem}-{suffix:02d}")
-        try:
-            path.mkdir()
-            return path
-        except FileExistsError:
-            continue
-    raise FileExistsError("Cannot allocate a new output directory.")
 
 
 def baseline(input_path: Path, *, config_path=DEFAULT_CONFIG, backend="local",
@@ -42,7 +28,7 @@ def baseline(input_path: Path, *, config_path=DEFAULT_CONFIG, backend="local",
     body = thinking_body(load_thinking_options(thinking_options), phase)
     prompt = (PROJECT_ROOT / "prompts/baseline/system.md").read_text(encoding="utf-8")
 
-    directory = create_output_dir(Path(output_root or PROJECT_ROOT / "creations"), "baseline-")
+    directory = create_output_dir(Path(output_root or CREATIONS), "baseline-")
     (directory / "00_input.txt").write_text(idea, encoding="utf-8")
     with gateway_factory(
         model=phase.model, base_url=config.base_url, api_key=config.api_key.get_secret_value(),

@@ -14,7 +14,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from main import baseline, create_output_dir
+from main import baseline
+from novel.run import create_output_dir
 from novel.schema import Plot
 from util.config import DEFAULT_CONFIG, ConfigError, load_backend, load_thinking_options, thinking_body
 from util.gateway import OpenAICompatibleGateway, create_message
