@@ -38,7 +38,12 @@ def _undecided(plot: Plot) -> list[PlotFinding]:
 
 
 def _unused(plot: Plot) -> list[PlotFinding]:
-    """どのシーンの beats にも名前が現れない登場人物・設定(D14)。"""
+    """どのシーンの beats にも名前が現れない登場人物・設定(D14)。
+
+    設定は opening.place での参照も使用とみなす。舞台として使われていても、名前が
+    beats の文に出てこないことがある(実測で「住宅街の路地裏」が全5シーンの場所なのに
+    未使用と報告された)。
+    """
     beats = "\n".join(beat for scene in plot.scenes for beat in scene.beats)
     findings = []
     for index, character in enumerate(plot.characters):
@@ -46,11 +51,12 @@ def _unused(plot: Plot) -> list[PlotFinding]:
             findings.append(PlotFinding(
                 check="unused", location=f"characters[{index}].name",
                 detail=f"「{character.name}」がどのシーンの beats にも現れない"))
+    places = {scene.opening.place for scene in plot.scenes}
     for index, setting in enumerate(plot.settings):
-        if setting.name not in beats:
+        if setting.name not in beats and setting.name not in places:
             findings.append(PlotFinding(
                 check="unused", location=f"settings[{index}].name",
-                detail=f"「{setting.name}」がどのシーンの beats にも現れない"))
+                detail=f"「{setting.name}」がどのシーンの beats にも opening.place にも現れない"))
     return findings
 
 

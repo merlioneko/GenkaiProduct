@@ -66,6 +66,14 @@ class PlotCheckTest(unittest.TestCase):
         plot.settings.append(plot.settings[0].model_copy(update={"name": "神社跡地"}))
         self.assertEqual(kinds(checks.check_plot(plot)), ["unused"])
 
+    def test_a_place_used_only_as_a_scene_location_is_not_unused(self):
+        # 実測で出た誤検出。舞台として使われていても beats に名前が出ないことがある。
+        plot = healthy_plot()
+        for setting, scene in zip(plot.settings, plot.scenes):
+            setting.name = "住宅街の" + setting.name
+            scene.opening.place = setting.name
+        self.assertEqual(checks.check_plot(plot).findings, [])
+
     def test_an_undefined_place_is_detected(self):
         plot = healthy_plot()
         plot.scenes[0].opening.place = "自宅"
