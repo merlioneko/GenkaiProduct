@@ -118,8 +118,9 @@ class CheckResult(BaseModel):
 
 class ConceptFinding(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
-    kind: Literal["missing", "reordered", "weakened"] = Field(
-        description="missing=指定要素が構想に無い, reordered=出来事の順序が入力と違う, weakened=指定語の意味が弱められている")
+    kind: Literal["missing", "reordered", "weakened", "altered"] = Field(
+        description="missing=指定要素が構想に無い, reordered=出来事の順序が入力と違う, "
+                    "weakened=指定語の意味が弱められている, altered=指定の意味が別のものに変わっている")
     element: str = Field(description="対象の指定要素。ユーザ入力での表現をそのまま引く")
     detail: str = Field(description="何がどう違うかの説明。構想側の該当箇所を引用する")
 

@@ -473,7 +473,7 @@ class Novel(BaseModel):
 
 - **入力**: `00_input.txt`、`prompts/concept/system.md`
 - **出力**: `02_concept.md`
-- **照合(Concept照合)**: `00_input.txt` と `02_concept.md` の指定要素をQwenで比較し、欠落・順序変更・意味の弱化を `02_concept_report.json` に出力する。報告のみで、処理は止めない。
+- **照合(Concept照合)**: `00_input.txt` と `02_concept.md` をQwenで比較し、欠落・順序変更・意味の弱化・意味の改変を `02_concept_report.json` に出力する。指定要素だけでなく構想本文も対象とする(「# 出来事」に正しく書かれていても「## 展開」で意味が変わる例が実測で出たため)。報告のみで、処理は止めない。
 - 改変許容度の指示文は `concept/system.md` 内の1箇所にまとめる(将来のパラメータ化に備えるため)。
 
 ### Structure

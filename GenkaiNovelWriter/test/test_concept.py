@@ -179,6 +179,16 @@ class ConceptVerifyTest(PhaseFixture):
         self.assertEqual(call["kwargs"]["phase"], "concept_verify")
         self.assertEqual(call["kwargs"]["model"], self.config.phase("concept").model)
 
+    def test_a_reversal_in_the_body_is_reportable(self):
+        # 実測で出た失敗。「# 出来事」は正しいのに「## 展開」で加害と被害が入れ替わっていた。
+        report = ConceptReport(findings=[ConceptFinding(
+            kind="altered", element="友人が他校の生徒に傷つけられた",
+            detail="展開1では「友人が他校のチンピラにケガを負わせた」と逆になっている")])
+        phase.verify_concept(self.directory, self.config,
+                             gateway_factory=gateway_returning(parsed=report))
+        saved = json.loads((self.directory / run.CONCEPT_REPORT).read_text(encoding="utf-8"))
+        self.assertEqual(saved["findings"][0]["kind"], "altered")
+
     def test_an_empty_report_is_still_written(self):
         phase.verify_concept(self.directory, self.config,
                              gateway_factory=gateway_returning(parsed=ConceptReport(findings=[])))
