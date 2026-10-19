@@ -11,6 +11,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from util.log import append_call
+from util.models import prepare_local_model
 
 
 def create_message(history: list | None = None, system: str = "", user: str = "") -> list:
@@ -36,6 +37,11 @@ class OpenAICompatibleGateway:
         self.request_body = dict(request_body or {})
         self.log_path = Path(log_path)
         self.last_response = None
+        self.scene_index = None
+        # 注入されたクライアントは接続先・モデル管理も呼び出し側が担う(オフラインテスト等)。
+        self._prepare_model = client is None and backend == "local"
+        self._base_url = base_url
+        self._api_key = api_key
         if client is None:
             from openai import OpenAI
             # SDK の自動リトライは切る。1呼び出し=1記録にするため。
@@ -71,6 +77,9 @@ class OpenAICompatibleGateway:
         error_type = None
         error_usage = {}
         try:
+            if self._prepare_model:
+                prepare_local_model(self._base_url, self._api_key, self.model)
+                self._prepare_model = False
             arguments: dict[str, Any] = {"model": self.model, "messages": messages, "stream": False}
             if self.request_body:
                 arguments["extra_body"] = self.request_body
@@ -119,6 +128,7 @@ class OpenAICompatibleGateway:
             stats = getattr(response, "stats", None)
             append_call(self.log_path, {
                 "phase": self.phase, "backend": self.backend,
+                "scene": self.scene_index,
                 "model": self.model, "thinking": self.thinking,
                 "thinking_request_supplied": bool(self.request_body),
                 "input_tokens": tokens("prompt_tokens"), "output_tokens": output_tokens,

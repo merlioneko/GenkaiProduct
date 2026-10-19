@@ -1,7 +1,7 @@
 """GenkaiNovelWriter CLI。
 
 サブコマンドごとに1関数。中身は「設定を読む → 実行ディレクトリを作る → フェーズを呼ぶ → ファイルに書く」の直線。
-現在は baseline と stage concept / stage structure。run / write は M3 以降で追加する(SPEC.md「CLI」)。
+全フェーズ一括の run は M5 で追加する(SPEC.md「CLI」)。
 """
 
 import argparse
@@ -11,16 +11,18 @@ from pathlib import Path
 from novel import checks, run
 from novel.phases import concept as concept_phase
 from novel.phases import structure as structure_phase
+from novel.phases import writing as writing_phase
 from novel.run import CREATIONS, create_output_dir
 from util.config import (
     DEFAULT_CONFIG, PROJECT_ROOT, ConfigError, load_backend,
     load_thinking_options, thinking_body,
 )
 from util.gateway import OpenAICompatibleGateway, create_message
+from util.models import ModelSwitchError
 
 # 自分の例外だけは文面を出す。秘密の値を含まないため。
 REPORTABLE = (ConfigError, run.RunError, concept_phase.ConceptFormatError,
-              structure_phase.PlotFormatError, structure_phase.StructureError)
+              structure_phase.PlotFormatError, structure_phase.StructureError, ModelSwitchError)
 
 
 def baseline(input_path: Path, *, config_path=DEFAULT_CONFIG, backend="local",
@@ -51,6 +53,12 @@ def stage(name: str, *, run_dir=None, input_path=None, config_path=DEFAULT_CONFI
           backend="local", thinking_options=None, output_root=None, timeout=600,
           gateway_factory=OpenAICompatibleGateway) -> Path:
     """フェーズを1つだけ実行する。実行前に下流の成果物を退避する(D23)。"""
+    if name == "writing":
+        return write(run_dir, config_path=config_path, backend=backend,
+                     thinking_options=thinking_options, timeout=timeout,
+                     gateway_factory=gateway_factory)
+    if name not in ("concept", "structure"):
+        raise run.RunError(f"Unknown stage: {name}")
     config = load_backend(config_path, backend)
     if name == "concept" and run_dir is None:
         directory = run.create_run(input_path, output_root=output_root)
@@ -70,6 +78,27 @@ def stage(name: str, *, run_dir=None, input_path=None, config_path=DEFAULT_CONFI
     return directory
 
 
+def write(run_dir: Path | str, *, first: int = 1, config_path=DEFAULT_CONFIG,
+          backend="local", thinking_options=None, timeout=600,
+          gateway_factory=OpenAICompatibleGateway) -> Path:
+    """シーン k 以降を退避・再生成し、Assemble まで実行する。"""
+    config = load_backend(config_path, backend)
+    directory = run.open_run(run_dir)
+    plot = structure_phase.load_plot(directory)
+    writing_phase.validate_start(directory, plot, first)
+    thinking_body(load_thinking_options(thinking_options), config.phase("writing"))
+    # --from 1 は stage writing と同じ範囲(04 全体)を退避する。
+    if first == 1:
+        run.archive_downstream(directory, "writing")
+    else:
+        run.archive_from_scene(directory, first)
+    run.save_config_snapshot(directory, backend, config)
+    writing_phase.run_writing(directory, config, first=first, backend=backend,
+                              thinking_options=thinking_options, timeout=timeout,
+                              gateway_factory=gateway_factory)
+    return directory
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="GenkaiNovelWriter")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -83,10 +112,18 @@ def main(argv=None) -> int:
     command.add_argument("--timeout", type=float, default=600)
 
     command = commands.add_parser("stage", help="フェーズを1つだけ実行する")
-    command.add_argument("phase", choices=("concept", "structure"))
+    command.add_argument("phase", choices=("concept", "structure", "writing"))
     command.add_argument("--run", type=Path, dest="run_dir", help="既存の実行ディレクトリ")
     command.add_argument("--input", type=Path,
                          help="stage concept のみ。新しい実行ディレクトリを作って始める")
+    command.add_argument("--backend", choices=("local", "remote"), default="local")
+    command.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
+    command.add_argument("--thinking-options", type=Path)
+    command.add_argument("--timeout", type=float, default=600)
+
+    command = commands.add_parser("write", help="シーンk以降を再生成して結合する")
+    command.add_argument("--run", type=Path, dest="run_dir", required=True)
+    command.add_argument("--from", type=int, dest="first", required=True)
     command.add_argument("--backend", choices=("local", "remote"), default="local")
     command.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     command.add_argument("--thinking-options", type=Path)
@@ -98,11 +135,17 @@ def main(argv=None) -> int:
             parser.error("stage concept needs exactly one of --run or --input.")
         if args.phase != "concept" and args.run_dir is None:
             parser.error(f"stage {args.phase} needs --run.")
+        if args.phase != "concept" and args.input is not None:
+            parser.error(f"stage {args.phase} does not accept --input.")
 
     try:
         if args.command == "baseline":
             directory = baseline(args.input, config_path=args.config, backend=args.backend,
                                  thinking_options=args.thinking_options, timeout=args.timeout)
+        elif args.command == "write":
+            directory = write(args.run_dir, first=args.first, config_path=args.config,
+                              backend=args.backend, thinking_options=args.thinking_options,
+                              timeout=args.timeout)
         else:
             directory = stage(args.phase, run_dir=args.run_dir, input_path=args.input,
                               config_path=args.config, backend=args.backend,

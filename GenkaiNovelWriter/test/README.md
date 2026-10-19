@@ -61,7 +61,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe test/verify_backend.py --checks schema switching speed
 ```
 
-`creations/verify-<日時>/` に `verification.json`・`calls.jsonl`・各試行の出力が保存される。`schema` は10回試行し、スキーマ違反と API エラーを別々に数える。`switching` は Qwen → Gemma → Qwen の順に呼び、前後の `/api/v1/models` とメモリを記録する。前モデルが解放されているかは人手で判断する。
+`creations/verify-<日時>/` に `verification.json`・`calls.jsonl`・各試行の出力が保存される。`schema` は10回試行し、スキーマ違反と API エラーを別々に数える。`switching` は Qwen → Gemma → Qwen の順に呼び、前後の `/api/v1/models` とメモリを記録する。M3 以降は D39 の明示アンロードを適用した状態の検証になる。M1 の JIT のみによる検証とは区別し、前モデルが解放されているかは人手で判断する。
 
 ## 7. 実測後の記録
 
@@ -89,3 +89,26 @@ LM Studio を起動し、`.env/backends.json` の `concept` / `structure` に Qw
 - `03_plot_report.json` が、意図的に仕込んだ未使用キャラ・未定義の場所・「または」・出来事の順序違反を検出する。`03_plot.json` を手で書き換えてから、機械検査だけを呼び出して確かめる。
 
 `02_concept.md` の形式が崩れていた場合は、ファイルを残したままエラーで停止する。手で直してから `stage structure` に進める。`03_plot.json` がスキーマに適合しなかった場合は、3回試したあと最後の生出力が `03_plot_raw.txt` に残る。
+
+## 9. M3 の実行(Writing・再開・Assemble)
+
+通常の `.venv/Scripts/python.exe` は 2026-10-19 に Python 3.12.0・Pydantic 2.13.5・OpenAI SDK 3.14.1・httpx 0.28.1 で起動できることを確認した。以前の起動不能は現在再現しない。
+
+実機実行前に、LM Studio 側で執筆モデルのロード時コンテキスト長を **16384** にする。設定ファイルの `context_length` は記録用で、ロード設定を変更しない。`thinking` は `null`、タイムアウトは M2 の実績に従い1800秒を使う。
+
+```powershell
+.\.venv\Scripts\python.exe main.py stage writing --run creations/20261001-234342 --timeout 1800
+# scene_02.md を手で編集してから再開
+.\.venv\Scripts\python.exe main.py write --run creations/20261001-234342 --from 3 --timeout 1800
+```
+
+- `stage writing` と `write --from 1` は `04_scenes/` 全体・05・06を退避して全シーンを執筆する。`--from k` はシーンk以降・05・06のみ退避し、前のシーンには書き込まない。
+- 再開番号は1〜Plotのシーン数。範囲外の番号、壊れた Plot、再利用する本文の欠落・空ファイルは退避前に停止する。各シーン生成時に先行本文をファイルから全文読み直す。
+- 生成完了ごとに `04_scenes/scene_NN.md` を保存する。全シーン成功後に `05_draft.md` を結合し、標準出力に空白・改行を除いた各シーン字数と合計字数を出す。600字未満の警告は標準エラーに出す。
+- API エラー、空応答、途中打ち切りでは停止し、完成済みシーンは残す。失敗シーンから `write --from k` で再開する。入力の自動切り詰め・自動修復・自動再生成はしない。
+- `calls.jsonl` の `phase: writing` と `scene` で呼び出しを特定する。最終シーンの `input_tokens + output_tokens` が16384以下かを確認して U5 の判断材料とする。API が失敗時に usage を返さない場合は `null` のまま残し、推定値を実測扱いしない。
+- 各シーンの見出し・Scene Title・思考タグの混入、およびビートの指示文や役割名の不自然な流用を通読で確認する。Writing は本文を後処理で修正しない。機械的な汚染検査は M4 の作業。
+
+ローカルの実クライアントは、最初の生成前に `/api/v1/models` で実際のロード状態を取得する。担当モデル以外の LLM インスタンスを `lms unload <id>` で解放し、解放後の状態を再確認してから生成する(D39)。`lms` が見つからない、状態を取得できない、解放できない場合は生成を始めず停止する。`local` は loopback の LM Studio を使う。`remote` ではモデル管理を行わない。
+
+モデル一覧のキーと設定済み識別子が一致しない場合は、同じモデル・量子化であることを確認し、一覧にある正確なキーへ設定を合わせるか、`lms load <正確なキー> --identifier <設定済み識別子> --context-length 16384 --yes` で明示ロードする。モデルの自動代替は行わない。
