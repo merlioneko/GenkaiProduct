@@ -19,7 +19,7 @@ from test import verify_backend
 from novel.schema import Plot
 from test.verify_backend import run_probes
 from util.config import ConfigError, PROJECT_ROOT, load_backend, load_thinking_options, thinking_body
-from util.gateway import GenerationError, OpenAICompatibleGateway, create_message
+from util.gateway import GenerationError, OpenAICompatibleGateway, create_messages
 
 
 def plot_data():
@@ -184,7 +184,7 @@ class M1Test(unittest.TestCase):
         for content, finish in (("", "stop"), (None, "stop"), ("途中", "length")):
             with self.gateway(lambda request: sdk_http.Response(200, json=completion(content, finish=finish))) as gateway:
                 with self.assertRaises(GenerationError):
-                    gateway.text(create_message(user="入力"))
+                    gateway.text(create_messages(system="", user="入力"))
         self.assertEqual(len(self.logs()), 3)
         self.assertTrue(all(log["error_type"] == "GenerationError" for log in self.logs()))
 
@@ -193,7 +193,7 @@ class M1Test(unittest.TestCase):
             raise sdk_http.ConnectError("private-secret", request=request)
         with self.gateway(responder) as gateway:
             with self.assertRaises(Exception):
-                gateway.text(create_message(user="入力"))
+                gateway.text(create_messages(system="", user="入力"))
         self.assertEqual(len(self.requests), 1)
         log = self.logs()[0]
         self.assertIsNone(log["input_tokens"])
@@ -205,26 +205,26 @@ class M1Test(unittest.TestCase):
                 "usage": {"prompt_tokens": 17000, "completion_tokens": 0, "total_tokens": 17000}}
         with self.gateway(lambda request: sdk_http.Response(400, json=body)) as gateway:
             with self.assertRaises(Exception):
-                gateway.text(create_message(user="入力"))
+                gateway.text(create_messages(system="", user="入力"))
         log = self.logs()[0]
         self.assertEqual(log["input_tokens"], 17000)
         self.assertNotIn("private-secret", json.dumps(log))
 
     def test_missing_usage_is_null_not_zero(self):
         with self.gateway(lambda request: sdk_http.Response(200, json=completion(usage=False))) as gateway:
-            gateway.text(create_message())
+            gateway.text(create_messages(system="", user=""))
         self.assertIsNone(self.logs()[0]["output_tokens"])
         self.assertIsNone(self.logs()[0]["output_tokens_per_second_end_to_end"])
 
     def test_structured_response_uses_actual_spec_schema_and_validates(self):
         with self.gateway(lambda request: sdk_http.Response(200, json=completion(json.dumps(plot_data())))) as gateway:
-            plot = gateway.parse(create_message(), Plot)
+            plot = gateway.parse(create_messages(system="", user=""), Plot)
         self.assertEqual(plot.scenes[0].opening.place, "家")
         self.assertEqual(self.requests[0]["response_format"]["json_schema"]["name"], "Plot")
         self.assertFalse(self.requests[0]["response_format"]["json_schema"]["schema"]["additionalProperties"])
         with self.gateway(lambda request: sdk_http.Response(200, json=completion('{"Scenes": []}'))) as gateway:
             with self.assertRaises(ValidationError):
-                gateway.parse(create_message(), Plot)
+                gateway.parse(create_messages(system="", user=""), Plot)
         self.assertEqual(self.logs()[-1]["status"], "error")
 
     def test_spec_schema_rejects_extra_fields_and_empty_required_lists(self):
@@ -245,13 +245,6 @@ class M1Test(unittest.TestCase):
         data["scenes"][0]["target_chars"] = "1000"
         with self.assertRaises(ValidationError):
             Plot.model_validate_json(json.dumps(data))
-
-    def test_history_is_not_mutated_or_shared(self):
-        history = [{"role": "assistant", "content": "前文"}]
-        result = create_message(history=history)
-        result.append({"role": "user", "content": "別の文"})
-        self.assertEqual(len(history), 1)
-        self.assertEqual(len(create_message()), 2)
 
     # ---- 検証スクリプト ----
 

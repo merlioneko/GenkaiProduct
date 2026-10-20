@@ -12,7 +12,7 @@ from novel import run
 from novel.phases.concept import load_concept
 from novel.schema import Plot
 from util.config import PROJECT_ROOT, BackendConfig, load_thinking_options, thinking_body
-from util.gateway import OpenAICompatibleGateway, create_message
+from util.gateway import OpenAICompatibleGateway, create_messages
 
 SYSTEM_PROMPT = PROJECT_ROOT / "prompts/structure/system.md"
 RETRIES = 2
@@ -64,7 +64,7 @@ def run_structure(directory: Path | str, config: BackendConfig, *, backend: str 
     ) as gateway:
         for _ in range(retries + 1):
             try:
-                plot = gateway.parse(create_message(system=system, user=concept_text), Plot)
+                plot = gateway.parse(create_messages(system=system, user=concept_text), Plot)
                 break
             except ValidationError:
                 raw = _last_text(gateway)
