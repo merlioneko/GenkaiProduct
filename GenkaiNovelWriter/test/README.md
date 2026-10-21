@@ -2,6 +2,8 @@
 
 以下は `GenkaiNovelWriter` ディレクトリで実行する。Python 3.10 以上、Pydantic 2 が必要。
 
+本書は検証の実行手順を管理する。受け入れ条件の正本は [SPEC.md](../SPEC.md)、実施結果・環境・未検証事項の正本は [MILESTONES.md](../MILESTONES.md)。
+
 ## 1. 環境構築
 
 ```powershell
@@ -65,7 +67,7 @@ python -m venv .venv
 
 ## 7. 実測後の記録
 
-観測結果は `SPEC.md` の「M1 実機検証の記録」に書く。そこで確定できたものは未確定事項の表から消し、確定事項に D番号で移す。U2/U3/U4 は 2026-09-18 に D37/D38/D39 として確定済み。U7 は M5 まで未確定なので、速度は参考値として追記する。モデル名・量子化・コンテキスト長・LM Studio のバージョン・使用した思考パラメータも残す。プログラムが SPEC を自動更新することはない。
+観測結果は [MILESTONES.md](../MILESTONES.md) の該当マイルストーンに、検証日・対象コミット・コマンド・結果・成果物の場所・未検証範囲とともに記録する。モデル名・量子化・コンテキスト長・LM Studio のバージョン・使用した思考パラメータも残す。初回のバックエンド検証記録は [M1 検証記録](../MILESTONES.md#evidence-m1)を参照する。未確定事項を確定できた場合は、`SPEC.md` の U番号から D番号へ移し、結論・理由と検証記録への参照を残す。未確定の速度観測は MILESTONES.md に参考値として記録し、観測だけで U7 を確定しない。プログラムが文書を自動更新することはない。
 
 ## 8. M2 の実行(Concept・Structure)
 
@@ -80,19 +82,19 @@ LM Studio を起動し、`.env/backends.json` の `concept` / `structure` に Qw
 
 出力は `creations/<日時>/` に `00_input.txt`・`01_config.json`・`02_concept.md`・`02_concept_report.json`・`03_plot.json`・`03_plot_report.json`・`calls.jsonl`。
 
-確認すること(MILESTONES.md の M2 完了条件)。
+以下の操作で [SPEC.md の M2 受け入れ条件](../SPEC.md#acceptance-m2)を確認し、結果を MILESTONES.md に記録する。
 
 - `concrete_01.txt` と `vague_01.txt` の両方で、2つの stage が最後まで通る。
 - `concrete_01.txt` の `02_concept.md` の「# 制約」にジャンル(ドタバタラブコメ)が、「# 出来事」に「魔人到着 → 自力で再起 → 攻撃を受けて気絶」の順序が含まれている。
 - `02_concept.md` を手で編集してから `stage structure` を再実行すると、編集内容が `03_plot.json` に反映され、旧成果物が `_archive/<日時>/` に退避される。
-- `03_plot.json` を手で壊してから `stage structure` を再実行すると、パースエラーで停止する(退避された旧 Plot は `_archive/` に残る)。
+- 検証用コピーの `03_plot.json` を手で壊してから、Plot を読む後続の `stage writing --run <検証用コピー>` を実行し、パースエラーで退避・LLM 呼び出し前に停止することを確認する(AC-M2-4)。`stage structure` は Plot を再生成するため、この確認には使わない。確認後はコピーの Plot を元に戻す。
 - `03_plot_report.json` が、意図的に仕込んだ未使用キャラ・未定義の場所・「または」・出来事の順序違反を検出する。`03_plot.json` を手で書き換えてから、機械検査だけを呼び出して確かめる。
 
 `02_concept.md` の形式が崩れていた場合は、ファイルを残したままエラーで停止する。手で直してから `stage structure` に進める。`03_plot.json` がスキーマに適合しなかった場合は、3回試したあと最後の生出力が `03_plot_raw.txt` に残る。
 
 ## 9. M3 の実行(Writing・再開・Assemble)
 
-通常の `.venv/Scripts/python.exe` は 2026-10-19 に Python 3.12.0・Pydantic 2.13.5・OpenAI SDK 3.14.1・httpx 0.28.1 で起動できることを確認した。以前の起動不能は現在再現しない。
+実行前に、使用する環境の Python と依存ライブラリで通常の CLI が起動することを確認する。過去の環境確認は [M3 検証記録](../MILESTONES.md#evidence-m3)、確認対象は [SPEC.md の M3 受け入れ条件](../SPEC.md#acceptance-m3)を参照する。
 
 実機実行前に、LM Studio 側で執筆モデルのロード時コンテキスト長を **16384** にする。設定ファイルの `context_length` は記録用で、ロード設定を変更しない。`thinking` は `null`、タイムアウトは M2 の実績に従い1800秒を使う。
 
