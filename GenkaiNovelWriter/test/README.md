@@ -1,13 +1,23 @@
 # テストと実機検証
 
-以下は `GenkaiNovelWriter` ディレクトリで実行する。Python 3.10 以上、Pydantic 2 が必要。
+以下は `GenkaiNovelWriter` ディレクトリで実行する。Pydantic 2 が必要。
+検証済みの推奨環境は Python 3.12.15。古い Python 3.12.0 は使わず、セキュリティ修正済みの Python を使う(詳細は [SECURITY.md](../../SECURITY.md))。
 
 ## 1. 環境構築
 
 ```powershell
-python -m venv .venv
+# uv でプロジェクト内に修正版 Python を配置する(PATH・レジストリは変更しない)
+uv python install 3.12.15 --install-dir .python --no-bin --no-registry
+.\.python\cpython-3.12.15-windows-x86_64-none\python.exe -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade "pip>=26.2.2"
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip check
 ```
+
+既存 `.venv` の Python が古い場合は、先に `.venv` を `creations/` 内へ退避してから新規作成する。
+`pip install --upgrade` だけでは Python 本体は更新されない。
+uv を使わない場合は、別途セキュリティ修正済み Python を導入し、その実行ファイルで `-m venv .venv` を実行する。
+2026-10-22 の更新で `.venv` は Python 3.12.15・pip 26.2.2 に切り替えた。第9節の Python 3.12.0 は M3 検証当時の記録。
 
 ## 2. API 不要のテスト
 

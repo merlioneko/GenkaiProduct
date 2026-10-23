@@ -6,4 +6,5 @@ __pycache__/
 !.env.example
 creations/
 .venv/
+.python/
 **/.claude/worktrees/
