@@ -18,7 +18,7 @@ from main import baseline
 from novel.run import create_output_dir
 from novel.schema import Plot
 from util.config import DEFAULT_CONFIG, ConfigError, load_backend, load_thinking_options, thinking_body
-from util.gateway import OpenAICompatibleGateway, create_message
+from util.gateway import OpenAICompatibleGateway, create_messages
 
 THINK_TAG = re.compile(r"</?(?:think|thinking|analysis|reasoning)(?:\s[^>]*)?>", re.I)
 
@@ -107,7 +107,7 @@ def run_probes(config, options, directory, idea, checks, *, timeout=600,
                              thinking=phase.thinking if body else None, request_body=body,
                              log_path=directory / "calls.jsonl", timeout=timeout) as gateway:
             try:
-                response = gateway.chat_response(create_message(
+                response = gateway.chat_response(create_messages(
                     system="指示に回答してください。", user=prompt), response_schema=schema)
                 observation = thinking_observation(response)
                 save_json(directory / f"{label}.json", observation)

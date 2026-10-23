@@ -17,7 +17,7 @@ from util.config import (
     DEFAULT_CONFIG, PROJECT_ROOT, ConfigError, load_backend,
     load_thinking_options, thinking_body,
 )
-from util.gateway import OpenAICompatibleGateway, create_message
+from util.gateway import OpenAICompatibleGateway, create_messages
 from util.models import ModelSwitchError
 
 # 自分の例外だけは文面を出す。秘密の値を含まないため。
@@ -44,7 +44,7 @@ def baseline(input_path: Path, *, config_path=DEFAULT_CONFIG, backend="local",
         phase="baseline", backend=backend, thinking=phase.thinking, request_body=body,
         log_path=directory / "calls.jsonl", timeout=timeout,
     ) as gateway:
-        text = gateway.text(create_message(system=prompt, user=idea))
+        text = gateway.text(create_messages(system=prompt, user=idea))
     (directory / "baseline.md").write_text(text, encoding="utf-8")
     return directory
 

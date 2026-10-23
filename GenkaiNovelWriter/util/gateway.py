@@ -14,9 +14,9 @@ from util.log import append_call
 from util.models import prepare_local_model
 
 
-def create_message(history: list | None = None, system: str = "", user: str = "") -> list:
-    """system と user のメッセージ列を作る。history は変更しない。"""
-    return list(history or []) + [
+def create_messages(*, system: str, user: str) -> list[dict[str, str]]:
+    """system、user の順で生成用のメッセージ列を作る。"""
+    return [
         {"role": "system", "content": system},
         {"role": "user", "content": user},
     ]

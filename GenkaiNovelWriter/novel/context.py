@@ -5,7 +5,7 @@ from pathlib import Path
 
 from novel import run
 from novel.schema import Novel, NovelScene, Plot
-from util.gateway import create_message
+from util.gateway import create_messages
 
 
 def load_novel(directory: Path | str, plot: Plot, *, until: int | None = None) -> Novel:
@@ -52,4 +52,4 @@ def writing_messages(directory: Path | str, plot: Plot, number: int, system: str
             "target_chars": scene.target_chars,
         }),
     ])
-    return create_message(system=system, user=user)
+    return create_messages(system=system, user=user)

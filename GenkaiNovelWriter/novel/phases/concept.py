@@ -11,7 +11,7 @@ from pathlib import Path
 from novel import run
 from novel.schema import Concept, ConceptReport
 from util.config import PROJECT_ROOT, BackendConfig, load_thinking_options, thinking_body
-from util.gateway import OpenAICompatibleGateway, create_message
+from util.gateway import OpenAICompatibleGateway, create_messages
 
 SYSTEM_PROMPT = PROJECT_ROOT / "prompts/concept/system.md"
 VERIFY_PROMPT = PROJECT_ROOT / "prompts/concept/verify.md"
@@ -73,7 +73,7 @@ def run_concept(directory: Path | str, config: BackendConfig, *, backend: str = 
         phase="concept", backend=backend, thinking=phase.thinking, request_body=body,
         log_path=directory / run.CALLS, timeout=timeout,
     ) as gateway:
-        text = gateway.text(create_message(system=system, user=idea))
+        text = gateway.text(create_messages(system=system, user=idea))
 
     (directory / run.CONCEPT).write_text(text.strip() + "\n", encoding="utf-8")
     return parse_concept(text)
@@ -105,7 +105,7 @@ def verify_concept(directory: Path | str, config: BackendConfig, *, backend: str
         phase="concept_verify", backend=backend, thinking=phase.thinking, request_body=body,
         log_path=directory / run.CALLS, timeout=timeout,
     ) as gateway:
-        report = gateway.parse(create_message(system=system, user=user), ConceptReport)
+        report = gateway.parse(create_messages(system=system, user=user), ConceptReport)
 
     (directory / run.CONCEPT_REPORT).write_text(
         json.dumps(report.model_dump(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
