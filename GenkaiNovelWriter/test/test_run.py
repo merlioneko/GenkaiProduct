@@ -29,7 +29,7 @@ class RunDirectoryTest(unittest.TestCase):
     def all_artifacts(self):
         return [run.CONCEPT, run.CONCEPT_REPORT, run.PLOT, run.PLOT_REPORT,
                 f"{run.SCENES}/scene_01.md", f"{run.SCENES}/scene_02.md", f"{run.SCENES}/scene_03.md",
-                run.DRAFT, f"{run.CHECK}/elements.json", run.CHECK_REPORT]
+                run.DRAFT, f"{run.CHECK}/elements.json", run.CHECK_REPORT, run.EVAL]
 
     def test_create_run_writes_input_and_rejects_empty_idea(self):
         directory = self.make_run()
@@ -69,7 +69,7 @@ class RunDirectoryTest(unittest.TestCase):
         destination = run.archive_downstream(directory, "structure")
         self.assertTrue((directory / run.CONCEPT).exists())
         self.assertTrue((directory / run.CONCEPT_REPORT).exists())
-        for name in (run.PLOT, run.PLOT_REPORT, run.SCENES, run.DRAFT, run.CHECK, run.CHECK_REPORT):
+        for name in (run.PLOT, run.PLOT_REPORT, run.SCENES, run.DRAFT, run.CHECK, run.CHECK_REPORT, run.EVAL):
             self.assertFalse((directory / name).exists(), name)
         # 退避であって削除ではない(D23)。元の相対パスを保つ。
         self.assertEqual((destination / run.PLOT).read_text(encoding="utf-8"), "03_plot.json の中身")
@@ -87,9 +87,17 @@ class RunDirectoryTest(unittest.TestCase):
         directory = self.make_run(*self.all_artifacts())
         run.archive_downstream(directory, "check")
         self.assertTrue((directory / run.DRAFT).exists())
+        self.assertTrue((directory / run.EVAL).exists())
         self.assertTrue((directory / run.SCENES / "scene_01.md").exists())
         self.assertFalse((directory / run.CHECK).exists())
         self.assertFalse((directory / run.CHECK_REPORT).exists())
+
+    def test_stage_writing_archives_evaluation_with_the_draft(self):
+        directory = self.make_run(*self.all_artifacts())
+        destination = run.archive_downstream(directory, "writing")
+        self.assertFalse((directory / run.EVAL).exists())
+        self.assertEqual((destination / run.EVAL).read_text(encoding="utf-8"), "07_eval.md の中身")
+        self.assertTrue((directory / run.PLOT).exists())
 
     def test_write_from_k_keeps_earlier_scenes(self):
         directory = self.make_run(*self.all_artifacts())
@@ -99,6 +107,8 @@ class RunDirectoryTest(unittest.TestCase):
         self.assertTrue((destination / run.SCENES / "scene_03.md").exists())
         self.assertFalse((directory / run.DRAFT).exists())
         self.assertFalse((directory / run.CHECK_REPORT).exists())
+        self.assertFalse((directory / run.EVAL).exists())
+        self.assertEqual((destination / run.EVAL).read_text(encoding="utf-8"), "07_eval.md の中身")
 
     def test_write_from_one_archives_every_scene(self):
         directory = self.make_run(*self.all_artifacts())

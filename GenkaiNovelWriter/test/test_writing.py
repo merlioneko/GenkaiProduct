@@ -102,7 +102,7 @@ class WritingTest(unittest.TestCase):
         second = self.save_scene(2, "二番目を手で編集。\n" + "全文" * 500)
         before = [first.read_bytes(), second.read_bytes()]
         self.save_scene(3, "旧三番目")
-        for name in (run.DRAFT, run.CHECK_REPORT, f"{run.CHECK}/elements.json"):
+        for name in (run.DRAFT, run.CHECK_REPORT, f"{run.CHECK}/elements.json", run.EVAL):
             path = self.directory / name
             path.parent.mkdir(exist_ok=True)
             path.write_text("旧成果物", encoding="utf-8")
@@ -113,9 +113,10 @@ class WritingTest(unittest.TestCase):
         archive = next((self.directory / run.ARCHIVE).iterdir())
         self.assertEqual(run.scene_path(archive, 3).read_text(encoding="utf-8"), "旧三番目")
         self.assertFalse(run.scene_path(archive, 1).exists())
-        for name in (run.DRAFT, run.CHECK_REPORT, f"{run.CHECK}/elements.json"):
+        for name in (run.DRAFT, run.CHECK_REPORT, f"{run.CHECK}/elements.json", run.EVAL):
             self.assertEqual((archive / name).read_text(encoding="utf-8"), "旧成果物")
         self.assertFalse((self.directory / run.CHECK).exists())
+        self.assertFalse((self.directory / run.EVAL).exists())
 
     def test_from_one_archives_entire_scenes_directory(self):
         self.save_scene(1, "旧本文")

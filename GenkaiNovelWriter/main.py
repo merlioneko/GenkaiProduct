@@ -1,14 +1,14 @@
 """GenkaiNovelWriter CLI。
 
 サブコマンドごとに1関数。中身は「設定を読む → 実行ディレクトリを作る → フェーズを呼ぶ → ファイルに書く」の直線。
-全フェーズ一括の run は M5 で追加する(SPEC.md「CLI」)。
+run は生成部分と人手評価テンプレートの保存まで実行する(SPEC.md「CLI」D43)。
 """
 
 import argparse
 import sys
 from pathlib import Path
 
-from novel import checks, run
+from novel import checks, evaluation, run
 from novel.phases import concept as concept_phase
 from novel.phases import structure as structure_phase
 from novel.phases import writing as writing_phase
@@ -78,6 +78,28 @@ def stage(name: str, *, run_dir=None, input_path=None, config_path=DEFAULT_CONFI
     return directory
 
 
+def run_pipeline(input_path: Path, *, config_path=DEFAULT_CONFIG, backend="local",
+                 thinking_options=None, output_root=None, timeout=600,
+                 gateway_factory=OpenAICompatibleGateway) -> Path:
+    """新しい実行ディレクトリで生成部分を一括実行する。失敗時は後続を呼ばない。"""
+    config = load_backend(config_path, backend)
+    options = load_thinking_options(thinking_options)
+    for name in ("concept", "structure", "writing"):
+        thinking_body(options, config.phase(name))
+    directory = run.create_run(input_path, output_root=output_root)
+    print(f"Run: {directory}", file=sys.stderr, flush=True)
+    run.save_config_snapshot(directory, backend, config)
+    arguments = {"backend": backend, "thinking_options": thinking_options,
+                 "timeout": timeout, "gateway_factory": gateway_factory}
+    concept_phase.run_concept(directory, config, **arguments)
+    concept_phase.verify_concept(directory, config, **arguments)
+    plot = structure_phase.run_structure(directory, config, **arguments)
+    checks.save_plot_report(directory, checks.check_plot(plot))
+    writing_phase.run_writing(directory, config, **arguments)
+    evaluation.save_template(directory)
+    return directory
+
+
 def write(run_dir: Path | str, *, first: int = 1, config_path=DEFAULT_CONFIG,
           backend="local", thinking_options=None, timeout=600,
           gateway_factory=OpenAICompatibleGateway) -> Path:
@@ -102,6 +124,13 @@ def write(run_dir: Path | str, *, first: int = 1, config_path=DEFAULT_CONFIG,
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="GenkaiNovelWriter")
     commands = parser.add_subparsers(dest="command", required=True)
+
+    command = commands.add_parser("run", help="生成部分を一括実行し、人手評価テンプレートを保存する")
+    command.add_argument("--input", type=Path, required=True)
+    command.add_argument("--backend", choices=("local", "remote"), default="local")
+    command.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
+    command.add_argument("--thinking-options", type=Path)
+    command.add_argument("--timeout", type=float, default=600)
 
     command = commands.add_parser("baseline", help="一発生成でベースラインを出力する")
     command.add_argument("--input", type=Path, required=True)
@@ -139,7 +168,10 @@ def main(argv=None) -> int:
             parser.error(f"stage {args.phase} does not accept --input.")
 
     try:
-        if args.command == "baseline":
+        if args.command == "run":
+            directory = run_pipeline(args.input, config_path=args.config, backend=args.backend,
+                                     thinking_options=args.thinking_options, timeout=args.timeout)
+        elif args.command == "baseline":
             directory = baseline(args.input, config_path=args.config, backend=args.backend,
                                  thinking_options=args.thinking_options, timeout=args.timeout)
         elif args.command == "write":

@@ -26,14 +26,15 @@ SCENES = "04_scenes"
 DRAFT = "05_draft.md"
 CHECK = "06_check"
 CHECK_REPORT = "06_check_report.md"
+EVAL = "07_eval.md"
 CALLS = "calls.jsonl"
 ARCHIVE = "_archive"
 
 # SPEC.md「退避」の表。キーは実行したステージ、値はそのステージが退避する下流の成果物。
 DOWNSTREAM = {
-    "concept": [CONCEPT, CONCEPT_REPORT, PLOT, PLOT_REPORT, PLOT_RAW, SCENES, DRAFT, CHECK, CHECK_REPORT],
-    "structure": [PLOT, PLOT_REPORT, PLOT_RAW, SCENES, DRAFT, CHECK, CHECK_REPORT],
-    "writing": [SCENES, DRAFT, CHECK, CHECK_REPORT],
+    "concept": [CONCEPT, CONCEPT_REPORT, PLOT, PLOT_REPORT, PLOT_RAW, SCENES, DRAFT, CHECK, CHECK_REPORT, EVAL],
+    "structure": [PLOT, PLOT_REPORT, PLOT_RAW, SCENES, DRAFT, CHECK, CHECK_REPORT, EVAL],
+    "writing": [SCENES, DRAFT, CHECK, CHECK_REPORT, EVAL],
     "check": [CHECK, CHECK_REPORT],
 }
 
@@ -145,9 +146,9 @@ def archive_downstream(directory: Path | str, stage: str) -> Path | None:
 
 
 def archive_from_scene(directory: Path | str, first: int) -> Path | None:
-    """write --from k を実行する前に、シーン k 以降と 05・06 を退避する。"""
+    """write --from k を実行する前に、シーン k 以降と 05・06・07 を退避する。"""
     if first < 1:
         raise RunError(f"Scene number must be 1 or greater: {first}")
     scenes = [f"{SCENES}/{path.name}" for path in scene_paths(directory)
               if scene_number(path) >= first]
-    return archive(directory, scenes + [DRAFT, CHECK, CHECK_REPORT])
+    return archive(directory, scenes + [DRAFT, CHECK, CHECK_REPORT, EVAL])
