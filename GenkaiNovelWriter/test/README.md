@@ -142,3 +142,18 @@ LM Studioを本ツール専用で使用する(D46、旧U16)。同じサーバを
 - `test/test_pipeline.py` は実フェーズとSDKにメモリ上のHTTP応答を与え、一括実行・各呼び出しでの失敗・不正な成果物・評価票生成/退避を検証する。第2節のオフラインテストに含まれる。
 
 各呼び出し前後の `/api/v1/models` を保存し、QwenのみからGemmaのみへの切替と実ロード長を記録する。設定値を実ロード長の証拠に代えない。今回の実機手順・環境制約・証拠は [M4検証記録](../MILESTONES.md#evidence-m4)を参照する。M4の動作確認はM5の比較評価とは別に扱う。
+
+## 11. M5 の比較採取
+
+[比較計画](../docs/m5-comparison-plan.md)のもとで `test/compare_generation.py` を使う。LM Studioを専用運用し、量子化まで含む正確なモデルキーと `thinking: null` を設定しておく。
+
+```powershell
+.\.venv\Scripts\python.exe test/compare_generation.py prepare --study creations/m5-<日時> --config .env/m4-verification.json --evaluator ユーザ
+.\.venv\Scripts\python.exe test/compare_generation.py execute --study creations/m5-<日時> --config .env/m4-verification.json
+```
+
+`prepare` は両モデルを順に明示ロードして実ロード設定を観測し、生成前の `plan.json` と `preflight.json` を保存する。既存のstudyディレクトリは上書きしない。`execute` は未実行の8試行を順に採取する。設定・コード・プロンプト・入力・既存成果物の変更やロード条件の不一致を検出すると停止する。API失敗時は成果物と台帳を残し、同じ試行を自動再生成しない。
+
+`results.json` と `status.md` に状況・経過時間・計測内訳・本文リンクが出る。失敗・中断済みの試行は再度executeしても再実行せず、台帳に残す。再試行が必要なら理由付きの別計画とし、失敗を隠して成功例だけを選ばない。人手の `human_review.md` は再実行時も上書きしない。本文や中間成果物は無編集のまま、全採取後に人手評価を記入する。
+
+環境制約で通常Pythonが使えない場合は、[M5記録](../MILESTONES.md#evidence-m5)の実際の実行手順・Python・依存バージョンを参照する。テスト方法と過去の成功記録を区別する。

@@ -26,6 +26,13 @@ For GenkaiNovelWriter work, read this guide, then [SPEC.md](GenkaiNovelWriter/SP
 
 The documentation organization adopted on 2026-10-21 separates requirements from evidence and keeps shared agent rules in one place. The migration and its verification are recorded in [MILESTONES.md](GenkaiNovelWriter/MILESTONES.md#documentation-review). Keep concise decision rationales in SPEC; if detailed decision history becomes too large, move it to `docs/adr/` with links instead of duplicating it.
 
+## User Instructions and Decision Requests
+
+- When asking the user to perform work, evaluate results, approve completion, or make a decision (especially milestone acceptance or technical choices), normally explain in this order: current status and completed work; why user input is needed; concrete steps to take and materials to open; what to observe and how to judge it; and the specific answer needed. IDs, technical terms, and abbreviations may supplement this explanation, but must not replace it.
+- Explain applicable criteria from SPEC or design documents and cite their location. If criteria are missing or ambiguous, say so and, when useful, propose criteria with reasons. Do not establish important specifications or evaluation criteria without user approval; keep proposals distinct from agreed requirements, following the document ownership rules above.
+- Resolve minor technical matters autonomously using existing specifications and design decisions. Ask for user judgment on specification changes, acceptable quality, user experience, and significant tradeoffs when existing decisions do not resolve them. Include a recommended option and its rationale whenever possible.
+- Group multiple requests in the order the user will perform them. Use concise, plain language with concrete verification and response instructions; never end with only “evaluate this” or “decide this.” Apply these rules across projects and tasks, without imposing NovelWriter-specific criteria on other projects.
+
 ## Project Structure & Module Organization
 
 - `GenkaiNovelWriter/` contains the primary Python CLI. `main.py` dispatches commands; `novel/` holds schemas, run artifacts, checks, and phase functions; `util/` provides backend configuration, API access, and logging.
