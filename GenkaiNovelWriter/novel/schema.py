@@ -102,14 +102,25 @@ class Novel(BaseModel):
 class CheckIssue(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     scene: int = Field(ge=1, description="問題のあるシーン番号")
-    quote: str = Field(description="問題箇所の抜粋(30字以内)")
-    reason: str = Field(description="問題の説明")
+    quote: str = Field(min_length=1, max_length=30, description="該当シーン原文の連続した抜粋(1〜30字)。欠落の指摘も関連する原文を引用")
+    reason: str = Field(min_length=1, description="問題の説明")
 
 
 class CheckResult(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
-    item: str = Field(description="検査項目名。contamination / length / elements / consistency / physical")
+    item: Literal["contamination", "length", "elements", "consistency", "physical"] = Field(description="検査項目名")
     issues: list[CheckIssue] = Field(default_factory=list)
+
+
+class SceneLength(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    scene: int = Field(ge=1)
+    characters: int = Field(ge=0)
+
+
+class LengthResult(CheckResult):
+    counts: list[SceneLength]
+    total: int = Field(ge=0)
 
 
 # ---- 照合・機械検査のレポート ----

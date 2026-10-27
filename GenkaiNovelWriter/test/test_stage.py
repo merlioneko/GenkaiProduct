@@ -148,9 +148,17 @@ class StageArgumentTest(unittest.TestCase):
         self.assertIn("--run", message)
 
     def test_unimplemented_stages_are_rejected(self):
-        code, message = self.run_cli(["stage", "check", "--run", "a"])
+        code, message = self.run_cli(["stage", "joining", "--run", "a"])
         self.assertEqual(code, 2)
-        self.assertIn("check", message)
+        self.assertIn("joining", message)
+
+    def test_check_needs_run_and_allow_name_is_check_only(self):
+        code, message = self.run_cli(["stage", "check"])
+        self.assertEqual(code, 2)
+        self.assertIn("--run", message)
+        code, message = self.run_cli(["stage", "structure", "--run", "a", "--allow-name", "NASA"])
+        self.assertEqual(code, 2)
+        self.assertIn("only", message)
 
     def test_a_missing_run_directory_is_reported_without_a_traceback(self):
         stderr = io.StringIO()

@@ -1,0 +1,320 @@
+{
+  "version": 1,
+  "prepared_date": "2026-10-26",
+  "base_commit": "a7ad6cc75abbc2687246e1cc31de769acbeb3dcc",
+  "human_evaluation": "未実施。既知一覧と照合手順をモデル比較前に固定。人手で理由と原文を確認し確定する。引用一致だけでTPとしない",
+  "matching_rules": [
+    "同じ項目・原因・該当場面を説明する指摘を人手で既知IDへ対応付ける。引用の完全一致は位置確認にのみ使う",
+    "1指摘が複数原因を正しく説明するなら複数IDへ対応可。既知IDは一度だけTP計上。重複指摘は別途duplicateとして数える",
+    "正常例への誤った指摘はFP。実出力の未列挙指摘を自動FPとせず、新規の妥当な指摘・誤検出・判断保留へ人手分類",
+    "known-only recall=TP/(TP+FN)。FPは誤った指摘件数。母集団外の新規妥当指摘は別記。失敗・未実行は分母に入れず項目別に未測定とする",
+    "未判定が残る項目の指標は未確定。採用閾値は新設せず、D45によりユーザが理由付き判断"
+  ],
+  "cases": [
+    {
+      "id": "synthetic-normal",
+      "kind": "synthetic",
+      "source": "M6用に新規作成。実モデル出力ではない",
+      "known_issues": [],
+      "controls": [
+        "normalは全LLM項目で問題なし。NASAは英字固有名として許可。思考という単語だけではタグとしない"
+      ],
+      "allowed_names": [
+        "NASA"
+      ],
+      "files": {
+        "00_input.txt": "0b0b88859dea07d26de7c26deae4eef1caca33f7784ac2f720b07798cc2e2900",
+        "03_plot.json": "91bf639092a63442e8792b2bae4175e3285a7f2d0c449c9cfa04895a17e51775",
+        "04_scenes/scene_01.md": "15acd8f1047fcdd34c2ec8a7a390a80a839d931c0ec19c4e7ecb899f74f7a67a",
+        "04_scenes/scene_02.md": "8f851799d9832cc937d23631477d42ba3a6a5646260fd1adeffe84746fd39e7c",
+        "05_draft.md": "4a258be4580dcf824ff06ee5cdf4f3c71962fd698fbbd92347d2a328ca247b4f"
+      }
+    },
+    {
+      "id": "synthetic-errors",
+      "kind": "synthetic",
+      "source": "M6用に新規作成。実モデル出力ではない",
+      "known_issues": [
+        {
+          "id": "E01",
+          "item": "elements",
+          "scene": 1,
+          "quote": "鍵を受け取る前に",
+          "rationale": "出来事2が出来事1より先に起きる明示的順序逆転"
+        },
+        {
+          "id": "E02",
+          "item": "elements",
+          "scene": 2,
+          "quote": "鐘には一度も触れず",
+          "rationale": "出来事3と最後に鐘を鳴らす制約が欠落"
+        },
+        {
+          "id": "C01",
+          "item": "consistency",
+          "scene": 2,
+          "quote": "生まれつき赤い瞳",
+          "rationale": "Plotの青い瞳と変化の理由なく衝突"
+        },
+        {
+          "id": "P01",
+          "item": "physical",
+          "scene": 2,
+          "quote": "隙間のない壁をすり抜けて",
+          "rationale": "魔法・超能力のない普通の人間が通過不能な壁を通過"
+        },
+        {
+          "id": "M01",
+          "item": "contamination",
+          "scene": 2,
+          "quote": "ish",
+          "rationale": "黒ishの英字混入。NASAだけは許可"
+        },
+        {
+          "id": "M02",
+          "item": "contamination",
+          "scene": 2,
+          "quote": "Episode 1",
+          "rationale": "メタ語"
+        },
+        {
+          "id": "M03",
+          "item": "contamination",
+          "scene": 2,
+          "quote": "幕を閉じた",
+          "rationale": "メタ語"
+        },
+        {
+          "id": "M04",
+          "item": "contamination",
+          "scene": 2,
+          "quote": "<think>",
+          "rationale": "思考タグ(閉じタグも対象)"
+        }
+      ],
+      "controls": [],
+      "allowed_names": [
+        "NASA"
+      ],
+      "files": {
+        "00_input.txt": "0b0b88859dea07d26de7c26deae4eef1caca33f7784ac2f720b07798cc2e2900",
+        "03_plot.json": "91bf639092a63442e8792b2bae4175e3285a7f2d0c449c9cfa04895a17e51775",
+        "04_scenes/scene_01.md": "ef3708ecae833f522ba9dbf6f52e07b53529625b72fb6bb05c2f04d38b1b60b8",
+        "04_scenes/scene_02.md": "53042f16781898c14b0690de5d448ef3d8d997ee98e65e0b57e22e68f0f5cc4f",
+        "05_draft.md": "6997d0b24dde20d5f5974a11ed0389fefb3282a6010bbd69a417a9d41282ec78"
+      }
+    },
+    {
+      "id": "m3-initial",
+      "kind": "real-output",
+      "source": "保存原文をバイト一致で複製。草稿のみ各シーンから再結合",
+      "provenance": {
+        "00_input.txt": {
+          "source": "creations/20261001-234342/00_input.txt",
+          "source_sha256": "d8dbb45bb4de0c9a121a8e1b402767f377608421a1164d53b8af6b8d8628f506",
+          "fixture_sha256": "d8dbb45bb4de0c9a121a8e1b402767f377608421a1164d53b8af6b8d8628f506"
+        },
+        "03_plot.json": {
+          "source": "creations/20261001-234342/03_plot.json",
+          "source_sha256": "ee4468f058580c481f7f921571ddefd453337b8681c23bb4ab0fb7a12ce2d666",
+          "fixture_sha256": "ee4468f058580c481f7f921571ddefd453337b8681c23bb4ab0fb7a12ce2d666"
+        },
+        "04_scenes/scene_01.md": {
+          "source": "creations/20261001-234342/04_scenes/scene_01.md",
+          "source_sha256": "97548b212751d2f26df254abf4d3ed400fa707d4145c92ebb5798312c1ed311a",
+          "fixture_sha256": "97548b212751d2f26df254abf4d3ed400fa707d4145c92ebb5798312c1ed311a"
+        },
+        "04_scenes/scene_02.md": {
+          "source": "creations/20261001-234342/04_scenes/scene_02.md",
+          "source_sha256": "9f928bbec1fcff91ea8920404d2da32450de7f8195337ea98d42e4d3ec216fcf",
+          "fixture_sha256": "9f928bbec1fcff91ea8920404d2da32450de7f8195337ea98d42e4d3ec216fcf"
+        },
+        "04_scenes/scene_03.md": {
+          "source": "creations/20261001-234342/_archive/20261019-221129/04_scenes/scene_03.md",
+          "source_sha256": "da10dd1254a907aa4ca723ccfa5ca9e266bd2bc63b2171a958adf47eff4a25f3",
+          "fixture_sha256": "da10dd1254a907aa4ca723ccfa5ca9e266bd2bc63b2171a958adf47eff4a25f3"
+        },
+        "04_scenes/scene_04.md": {
+          "source": "creations/20261001-234342/_archive/20261019-221129/04_scenes/scene_04.md",
+          "source_sha256": "9985d0ff343868446085dd4b25937b83666af02552bc4949b7db27cdbf9ec659",
+          "fixture_sha256": "9985d0ff343868446085dd4b25937b83666af02552bc4949b7db27cdbf9ec659"
+        },
+        "04_scenes/scene_05.md": {
+          "source": "creations/20261001-234342/_archive/20261019-221129/04_scenes/scene_05.md",
+          "source_sha256": "c47247255bc95256b8715060d45624bd0f870535bd4290973da013c2cb9ff065",
+          "fixture_sha256": "c47247255bc95256b8715060d45624bd0f870535bd4290973da013c2cb9ff065"
+        }
+      },
+      "known_issues": [
+        {
+          "id": "R01",
+          "item": "consistency",
+          "scene": 3,
+          "quote": "ミナリは",
+          "rationale": "同一場面のミナミと名前が揺れる。M3記録で既知"
+        }
+      ],
+      "controls": [
+        "シーン2は手編集を含む。新規無編集生成の品質比較ではない。M3当時のモデル条件は保存記録の範囲だけ参照",
+        "攻撃主体の逆転やメタ表現の過去報告は、この正解一覧では未確定。未列挙の指摘は人手で追加照合"
+      ],
+      "allowed_names": [],
+      "files": {
+        "00_input.txt": "d8dbb45bb4de0c9a121a8e1b402767f377608421a1164d53b8af6b8d8628f506",
+        "03_plot.json": "ee4468f058580c481f7f921571ddefd453337b8681c23bb4ab0fb7a12ce2d666",
+        "04_scenes/scene_01.md": "97548b212751d2f26df254abf4d3ed400fa707d4145c92ebb5798312c1ed311a",
+        "04_scenes/scene_02.md": "9f928bbec1fcff91ea8920404d2da32450de7f8195337ea98d42e4d3ec216fcf",
+        "04_scenes/scene_03.md": "da10dd1254a907aa4ca723ccfa5ca9e266bd2bc63b2171a958adf47eff4a25f3",
+        "04_scenes/scene_04.md": "9985d0ff343868446085dd4b25937b83666af02552bc4949b7db27cdbf9ec659",
+        "04_scenes/scene_05.md": "c47247255bc95256b8715060d45624bd0f870535bd4290973da013c2cb9ff065",
+        "05_draft.md": "197971b5c0f7cb0a26f8a59993a8ec343d5a4b52d298d953b7ba7cc31ce238c0"
+      }
+    },
+    {
+      "id": "m3-resumed",
+      "kind": "real-output",
+      "source": "保存原文をバイト一致で複製。草稿のみ各シーンから再結合",
+      "provenance": {
+        "00_input.txt": {
+          "source": "creations/20261001-234342/00_input.txt",
+          "source_sha256": "d8dbb45bb4de0c9a121a8e1b402767f377608421a1164d53b8af6b8d8628f506",
+          "fixture_sha256": "d8dbb45bb4de0c9a121a8e1b402767f377608421a1164d53b8af6b8d8628f506"
+        },
+        "03_plot.json": {
+          "source": "creations/20261001-234342/03_plot.json",
+          "source_sha256": "ee4468f058580c481f7f921571ddefd453337b8681c23bb4ab0fb7a12ce2d666",
+          "fixture_sha256": "ee4468f058580c481f7f921571ddefd453337b8681c23bb4ab0fb7a12ce2d666"
+        },
+        "04_scenes/scene_01.md": {
+          "source": "creations/20261001-234342/04_scenes/scene_01.md",
+          "source_sha256": "97548b212751d2f26df254abf4d3ed400fa707d4145c92ebb5798312c1ed311a",
+          "fixture_sha256": "97548b212751d2f26df254abf4d3ed400fa707d4145c92ebb5798312c1ed311a"
+        },
+        "04_scenes/scene_02.md": {
+          "source": "creations/20261001-234342/04_scenes/scene_02.md",
+          "source_sha256": "9f928bbec1fcff91ea8920404d2da32450de7f8195337ea98d42e4d3ec216fcf",
+          "fixture_sha256": "9f928bbec1fcff91ea8920404d2da32450de7f8195337ea98d42e4d3ec216fcf"
+        },
+        "04_scenes/scene_03.md": {
+          "source": "creations/20261001-234342/04_scenes/scene_03.md",
+          "source_sha256": "6b443953b910ba7ef206a268f0c68fe9e9a40fbe94c922f5cd4cfbacea1eef09",
+          "fixture_sha256": "6b443953b910ba7ef206a268f0c68fe9e9a40fbe94c922f5cd4cfbacea1eef09"
+        },
+        "04_scenes/scene_04.md": {
+          "source": "creations/20261001-234342/04_scenes/scene_04.md",
+          "source_sha256": "dceef7c41c06336281268abb752fcfb5ad1761004250b76c0ad807e7eaabcf79",
+          "fixture_sha256": "dceef7c41c06336281268abb752fcfb5ad1761004250b76c0ad807e7eaabcf79"
+        },
+        "04_scenes/scene_05.md": {
+          "source": "creations/20261001-234342/04_scenes/scene_05.md",
+          "source_sha256": "240b27137805eac50c6b6a36a3ae62ab1a35db37238ecaffb09837aab5959482",
+          "fixture_sha256": "240b27137805eac50c6b6a36a3ae62ab1a35db37238ecaffb09837aab5959482"
+        }
+      },
+      "known_issues": [
+        {
+          "id": "R02",
+          "item": "physical",
+          "scene": 3,
+          "quote": "その反動を利用して強引に立ち上がった",
+          "rationale": "膝をアスファルトに叩きつけた反動で立つ動作。M3で人手が不自然と指摘。原文の魔法設定を考慮し人手で最終照合"
+        }
+      ],
+      "controls": [
+        "手編集後の再開版。未列挙の指摘や魔法の許容範囲は人手で判断"
+      ],
+      "allowed_names": [],
+      "files": {
+        "00_input.txt": "d8dbb45bb4de0c9a121a8e1b402767f377608421a1164d53b8af6b8d8628f506",
+        "03_plot.json": "ee4468f058580c481f7f921571ddefd453337b8681c23bb4ab0fb7a12ce2d666",
+        "04_scenes/scene_01.md": "97548b212751d2f26df254abf4d3ed400fa707d4145c92ebb5798312c1ed311a",
+        "04_scenes/scene_02.md": "9f928bbec1fcff91ea8920404d2da32450de7f8195337ea98d42e4d3ec216fcf",
+        "04_scenes/scene_03.md": "6b443953b910ba7ef206a268f0c68fe9e9a40fbe94c922f5cd4cfbacea1eef09",
+        "04_scenes/scene_04.md": "dceef7c41c06336281268abb752fcfb5ad1761004250b76c0ad807e7eaabcf79",
+        "04_scenes/scene_05.md": "240b27137805eac50c6b6a36a3ae62ab1a35db37238ecaffb09837aab5959482",
+        "05_draft.md": "1e27759bc1448b23b5670a3267293f2dc9d653830339e67dafcbaffc30e81ae7"
+      }
+    },
+    {
+      "id": "m5-07",
+      "kind": "real-output",
+      "source": "保存原文をバイト一致で複製。草稿のみ各シーンから再結合",
+      "provenance": {
+        "00_input.txt": {
+          "source": "creations/m5-20261025/07-concrete_01-pipeline-2/20261025-204643/00_input.txt",
+          "source_sha256": "d8dbb45bb4de0c9a121a8e1b402767f377608421a1164d53b8af6b8d8628f506",
+          "fixture_sha256": "d8dbb45bb4de0c9a121a8e1b402767f377608421a1164d53b8af6b8d8628f506"
+        },
+        "03_plot.json": {
+          "source": "creations/m5-20261025/07-concrete_01-pipeline-2/20261025-204643/03_plot.json",
+          "source_sha256": "6f841b4547c6452f74df88a7c95a1618c3a086d8cf7f242eeb63da09305c83bf",
+          "fixture_sha256": "6f841b4547c6452f74df88a7c95a1618c3a086d8cf7f242eeb63da09305c83bf"
+        },
+        "04_scenes/scene_01.md": {
+          "source": "creations/m5-20261025/07-concrete_01-pipeline-2/20261025-204643/04_scenes/scene_01.md",
+          "source_sha256": "120dc17803ca9e8ff1753add8602b06dd962180135be5ee6c54012c1df0336da",
+          "fixture_sha256": "120dc17803ca9e8ff1753add8602b06dd962180135be5ee6c54012c1df0336da"
+        },
+        "04_scenes/scene_02.md": {
+          "source": "creations/m5-20261025/07-concrete_01-pipeline-2/20261025-204643/04_scenes/scene_02.md",
+          "source_sha256": "54daf3691c70815c0ec4bbcc67d514f5f8d489234912baa972614c5a4c002484",
+          "fixture_sha256": "54daf3691c70815c0ec4bbcc67d514f5f8d489234912baa972614c5a4c002484"
+        },
+        "04_scenes/scene_03.md": {
+          "source": "creations/m5-20261025/07-concrete_01-pipeline-2/20261025-204643/04_scenes/scene_03.md",
+          "source_sha256": "2149d827b817a432e6d7366c2c2f4eb113ed65e82d741211efa3c3323f2c857c",
+          "fixture_sha256": "2149d827b817a432e6d7366c2c2f4eb113ed65e82d741211efa3c3323f2c857c"
+        },
+        "04_scenes/scene_04.md": {
+          "source": "creations/m5-20261025/07-concrete_01-pipeline-2/20261025-204643/04_scenes/scene_04.md",
+          "source_sha256": "bf31aca98d0f0d9d709d7b18067fca4fb1ee8afd60b04dd5575900f2b0e5c236",
+          "fixture_sha256": "bf31aca98d0f0d9d709d7b18067fca4fb1ee8afd60b04dd5575900f2b0e5c236"
+        },
+        "04_scenes/scene_05.md": {
+          "source": "creations/m5-20261025/07-concrete_01-pipeline-2/20261025-204643/04_scenes/scene_05.md",
+          "source_sha256": "1a4c8c4be491a209a1d197b0ea8a10642dc3fde55285244756faf73009808c73",
+          "fixture_sha256": "1a4c8c4be491a209a1d197b0ea8a10642dc3fde55285244756faf73009808c73"
+        },
+        "04_scenes/scene_06.md": {
+          "source": "creations/m5-20261025/07-concrete_01-pipeline-2/20261025-204643/04_scenes/scene_06.md",
+          "source_sha256": "2b74de8fa7b6d4b2a748ab03103cdfd2b813472305257598bf4ff0c174ac1320",
+          "fixture_sha256": "2b74de8fa7b6d4b2a748ab03103cdfd2b813472305257598bf4ff0c174ac1320"
+        }
+      },
+      "known_issues": [],
+      "controls": [
+        "シーン2「帰らねぇぞよ」はPlotにもあるので、奇妙な口調という理由だけでは矛盾としない",
+        "シーン3のボールペン攻撃は迫力への主観的懸念。物理的不可能の確定正解にはしない",
+        "M5人手評価の同居理由・再起の弱さを、そのまま明示要素欠落の確定正解にしない。未列挙指摘は人手で照合"
+      ],
+      "allowed_names": [],
+      "files": {
+        "00_input.txt": "d8dbb45bb4de0c9a121a8e1b402767f377608421a1164d53b8af6b8d8628f506",
+        "03_plot.json": "6f841b4547c6452f74df88a7c95a1618c3a086d8cf7f242eeb63da09305c83bf",
+        "04_scenes/scene_01.md": "120dc17803ca9e8ff1753add8602b06dd962180135be5ee6c54012c1df0336da",
+        "04_scenes/scene_02.md": "54daf3691c70815c0ec4bbcc67d514f5f8d489234912baa972614c5a4c002484",
+        "04_scenes/scene_03.md": "2149d827b817a432e6d7366c2c2f4eb113ed65e82d741211efa3c3323f2c857c",
+        "04_scenes/scene_04.md": "bf31aca98d0f0d9d709d7b18067fca4fb1ee8afd60b04dd5575900f2b0e5c236",
+        "04_scenes/scene_05.md": "1a4c8c4be491a209a1d197b0ea8a10642dc3fde55285244756faf73009808c73",
+        "04_scenes/scene_06.md": "2b74de8fa7b6d4b2a748ab03103cdfd2b813472305257598bf4ff0c174ac1320",
+        "05_draft.md": "3ac47a54c865bd126a27e4e30d2a4c587c5bf2cda23080df431641e0e79d82e0"
+      }
+    }
+  ],
+  "excluded_observations": [
+    {
+      "trial": "03",
+      "source": "creations/m5-20261025/03-vague_01-baseline-1/baseline-20261025-201453/baseline.md",
+      "sha256": "055ef6165cad5d62eb94dc51c2edd16173164fffd910bdf5ea20354489459c8c",
+      "quote": "sure",
+      "reason": "英字混入の実例だが参照Plotがない一発生成。stage checkの完成シーン資料には含めない"
+    },
+    {
+      "trial": "06",
+      "source": "creations/m5-20261025/06-vague_01-baseline-2/baseline-20261025-204438/baseline.md",
+      "sha256": "9687eaa602e85cb79ab2d38a0ad1d491290224aeb58fd1ec96a264fe1403112a",
+      "quote": "正ちは",
+      "reason": "不自然な日本語。英字/メタ語/タグの機械検査対象外。正常例とも扱わない"
+    }
+  ]
+}

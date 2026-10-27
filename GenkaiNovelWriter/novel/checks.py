@@ -4,13 +4,54 @@
 """
 
 import json
+import re
 from pathlib import Path
 
 from novel import run
-from novel.schema import Plot, PlotFinding, PlotReport
+from novel.schema import CheckIssue, CheckResult, LengthResult, Novel, Plot, PlotFinding, PlotReport, SceneLength
 
 # 未決定表現(D13)。SPEC の「または」「(例)」「例:」に、全角の書き方を足したもの。
 UNDECIDED_MARKERS = ("または", "もしくは", "(例", "（例", "例:", "例：")
+
+THINK_TAG = re.compile(r"</?(?:think|thinking|analysis|reasoning)(?:\s[^>]*)?\s*/?>", re.I)
+LATIN = re.compile(r"[A-Za-z]+(?:[ .'-][A-Za-z]+)*")
+META = re.compile(r"Episode(?:\s*\d+)?|Scene(?:\s+Title|\s*\d+)?|第[0-9０-９一二三四五六七八九十]+話|幕を閉じた|ビート\s*[0-9０-９]+", re.I)
+
+
+def character_count(text: str) -> int:
+    return sum(not char.isspace() for char in text)
+
+
+def check_length(novel: Novel) -> LengthResult:
+    counts = [SceneLength(scene=scene.index, characters=character_count(scene.content))
+              for scene in novel.scenes]
+    issues = [CheckIssue(scene=scene.index, quote=scene.content[:30],
+                         reason=f"600字未満: {count.characters}字(警告のみ)")
+              for scene, count in zip(novel.scenes, counts) if count.characters < 600]
+    return LengthResult(item="length", issues=issues, counts=counts,
+                        total=sum(count.characters for count in counts))
+
+
+def check_contamination(novel: Novel, allowed_names: tuple[str, ...] = ()) -> CheckResult:
+    """明示許可した英字固有名は完全な語境界でのみ除外する。メタ語・タグは除外しない。"""
+    issues = []
+    for scene in novel.scenes:
+        text = scene.content
+        for pattern, label in ((THINK_TAG, "思考タグ"), (META, "メタ語")):
+            for match in pattern.finditer(text):
+                issues.append(CheckIssue(scene=scene.index, quote=match.group()[:30], reason=label))
+        # タグ・メタ語の同じ英字を重複報告しない。位置を保つため空白で埋める。
+        masked = list(text)
+        for pattern in (THINK_TAG, META):
+            for match in pattern.finditer(text):
+                masked[match.start():match.end()] = " " * (match.end() - match.start())
+        for name in sorted(set(allowed_names), key=len, reverse=True):
+            for match in re.finditer(r"(?<![A-Za-z])" + re.escape(name) + r"(?![A-Za-z])", text):
+                masked[match.start():match.end()] = " " * (match.end() - match.start())
+        for match in LATIN.finditer("".join(masked)):
+            issues.append(CheckIssue(scene=scene.index, quote=text[match.start():match.end()][:30],
+                                     reason="許可されていない英字の混入"))
+    return CheckResult(item="contamination", issues=issues)
 
 
 def check_plot(plot: Plot) -> PlotReport:

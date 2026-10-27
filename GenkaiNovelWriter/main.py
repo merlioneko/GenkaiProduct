@@ -12,6 +12,7 @@ from novel import checks, evaluation, run
 from novel.phases import concept as concept_phase
 from novel.phases import structure as structure_phase
 from novel.phases import writing as writing_phase
+from novel.phases import check as check_phase
 from novel.run import CREATIONS, create_output_dir
 from util.config import (
     DEFAULT_CONFIG, PROJECT_ROOT, ConfigError, load_backend,
@@ -22,7 +23,8 @@ from util.models import ModelSwitchError
 
 # 自分の例外だけは文面を出す。秘密の値を含まないため。
 REPORTABLE = (ConfigError, run.RunError, concept_phase.ConceptFormatError,
-              structure_phase.PlotFormatError, structure_phase.StructureError, ModelSwitchError)
+              structure_phase.PlotFormatError, structure_phase.StructureError, ModelSwitchError,
+              check_phase.CheckFormatError)
 
 
 def baseline(input_path: Path, *, config_path=DEFAULT_CONFIG, backend="local",
@@ -51,12 +53,18 @@ def baseline(input_path: Path, *, config_path=DEFAULT_CONFIG, backend="local",
 
 def stage(name: str, *, run_dir=None, input_path=None, config_path=DEFAULT_CONFIG,
           backend="local", thinking_options=None, output_root=None, timeout=600,
-          gateway_factory=OpenAICompatibleGateway) -> Path:
+          gateway_factory=OpenAICompatibleGateway, allowed_names=()) -> Path:
     """フェーズを1つだけ実行する。実行前に下流の成果物を退避する(D23)。"""
     if name == "writing":
         return write(run_dir, config_path=config_path, backend=backend,
                      thinking_options=thinking_options, timeout=timeout,
                      gateway_factory=gateway_factory)
+    if name == "check":
+        config = load_backend(config_path, backend)
+        directory = run.open_run(run_dir)
+        check_phase.run_check(directory, config, backend=backend, thinking_options=thinking_options,
+                              timeout=timeout, allowed_names=allowed_names, gateway_factory=gateway_factory)
+        return directory
     if name not in ("concept", "structure"):
         raise run.RunError(f"Unknown stage: {name}")
     config = load_backend(config_path, backend)
@@ -141,7 +149,9 @@ def main(argv=None) -> int:
     command.add_argument("--timeout", type=float, default=600)
 
     command = commands.add_parser("stage", help="フェーズを1つだけ実行する")
-    command.add_argument("phase", choices=("concept", "structure", "writing"))
+    command.add_argument("phase", choices=("concept", "structure", "writing", "check"))
+    command.add_argument("--allow-name", action="append", default=[], dest="allowed_names",
+                         help="stage check の英字固有名の明示許可(繰り返し指定可)")
     command.add_argument("--run", type=Path, dest="run_dir", help="既存の実行ディレクトリ")
     command.add_argument("--input", type=Path,
                          help="stage concept のみ。新しい実行ディレクトリを作って始める")
@@ -160,6 +170,8 @@ def main(argv=None) -> int:
 
     args = parser.parse_args(argv)
     if args.command == "stage":
+        if args.allowed_names and args.phase != "check":
+            parser.error("--allow-name is only available for stage check.")
         if args.phase == "concept" and bool(args.run_dir) == bool(args.input):
             parser.error("stage concept needs exactly one of --run or --input.")
         if args.phase != "concept" and args.run_dir is None:
@@ -181,7 +193,8 @@ def main(argv=None) -> int:
         else:
             directory = stage(args.phase, run_dir=args.run_dir, input_path=args.input,
                               config_path=args.config, backend=args.backend,
-                              thinking_options=args.thinking_options, timeout=args.timeout)
+                              thinking_options=args.thinking_options, timeout=args.timeout,
+                              allowed_names=args.allowed_names)
     except REPORTABLE as error:
         print(error, file=sys.stderr)
         return 1
