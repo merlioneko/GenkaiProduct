@@ -157,3 +157,32 @@ LM Studioを本ツール専用で使用する(D46、旧U16)。同じサーバを
 `results.json` と `status.md` に状況・経過時間・計測内訳・本文リンクが出る。失敗・中断済みの試行は再度executeしても再実行せず、台帳に残す。再試行が必要なら理由付きの別計画とし、失敗を隠して成功例だけを選ばない。人手の `human_review.md` は再実行時も上書きしない。本文や中間成果物は無編集のまま、全採取後に人手評価を記入する。
 
 環境制約で通常Pythonが使えない場合は、[M5記録](../MILESTONES.md#evidence-m5)の実際の実行手順・Python・依存バージョンを参照する。テスト方法と過去の成功記録を区別する。
+
+## 12. M6 のCheck・検査モデル比較
+
+完成したPlot・全シーン・草稿のある実行ディレクトリで単独実行する。生成部分の `run` はCheckを呼ばない(D43)。
+
+```powershell
+.\.venv\Scripts\python.exe main.py stage check --run creations/<日時> --timeout 1800
+# 英字固有名を許可する場合。繰り返し指定可
+.\.venv\Scripts\python.exe main.py stage check --run creations/<日時> --allow-name NASA --timeout 1800
+```
+
+`06_check/` に5項目のJSONとmetadata、`06_check_report.md` に結果を保存する。lengthのcounts/totalは空白・改行を除いた字数。600字未満は警告のみ。検査モデルの指摘は品質の合否を自動決定しない。
+
+欠落/空/余分なシーンや草稿との不一致は、旧結果の退避前に停止する。LLM検査はelements・consistency・physicalを別々に呼び、sceneと1〜30字のquoteを原文へ完全一致で照合する(D52)。不一致は形式エラーで停止し、生出力と完了済み項目・未実行の状態を残す。自動修復・再試行はしない。検査の再実行は06だけを退避する。本文・生成時の設定・人手評価07は変更しない。
+
+[固定評価資料](fixtures/check/README.md)と[既知一覧・照合基準](fixtures/check/manifest.json)を先に読む。モデル比較は専用運用のLM Studioと `.env/m4-verification.json` のstructure=Qwen、writing=Gemmaの正確なキーを使う。新しいstudyに固定コピーを保存し、次の順に実行する。
+
+```powershell
+.\.venv\Scripts\python.exe test/measure_check.py prepare --study creations/m6-<日時> --config .env/m4-verification.json --evaluator ユーザ
+.\.venv\Scripts\python.exe test/measure_check.py execute --study creations/m6-<日時> --config .env/m4-verification.json
+# human_review.mdを読み、human_review.jsonへ人手の照合結果を記入してから集計
+.\.venv\Scripts\python.exe test/measure_check.py summarize --study creations/m6-<日時>
+```
+
+prepareは本文や検査結果を生成せず、既知一覧・資料ハッシュ・コード/プロンプト・公開設定・評価者・順序を固定する。executeは5資料×2モデルを一度ずつ実行する。モデル群の開始前に書き手Gemmaを明示ロードし、Qwenへの切替とGemmaの継続利用を実際のAPI観測で確認する。実ロード長が設定値に一致しなければ失敗とする。モデル群の事前準備は各試行経過に含めず、試行内の切替・生成・保存・観測は含める。全状態はmodels.json、トークン/所要時間はcalls.jsonlへ保存する。OSキャッシュ・サーバ既定サンプリング・配置の完全固定はしない。
+
+失敗した試行もresults.jsonへ保持し、再度executeしても自動再試行しない。条件・資料・保存済み出力の変更は停止する。再試行が必要なら理由を記録して別studyを作る。採取途中で中断したrunningの試行も再利用しない。human_review.json/mdは既存なら上書きしない。
+
+人手で全指摘を既知IDに対応付け、誤検出・新規の妥当な指摘・重複・保留を区別する。引用の一致だけでTPにしない。未列挙の実出力指摘を自動FPにしない。既知IDの採否と根拠はモデル間で揃え、confirmed=trueはその項目の見逃しを含む照合完了後だけ設定する。summarizeは人手対応付けから項目別TP/FP/FN/検出率をmetrics.jsonへ集計し、未評価・失敗・未実行はnull/未確定のまま残す。採用・保留・不採用はD45に従いユーザが理由・限界・次の対応を記録する。[M6記録](../MILESTONES.md#milestone-m6)に結果を反映し、M6の完了を実装テストだけで宣言しない。

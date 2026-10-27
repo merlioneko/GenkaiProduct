@@ -1,0 +1,83 @@
+{
+  "meta": {
+    "genre": "日常",
+    "tone": "穏やか",
+    "style": "三人称",
+    "pov": "葵"
+  },
+  "constraints": [
+    "葵は青い瞳の人間で、魔法や超能力は存在しない",
+    "最後に葵が鐘を鳴らす"
+  ],
+  "events": [
+    "葵が管理人から鍵を受け取る",
+    "葵が鍵で扉を開けて部屋へ入る",
+    "葵が鐘を鳴らす"
+  ],
+  "characters": [
+    {
+      "name": "葵",
+      "persona": "落ち着いている",
+      "appearance": "青い瞳",
+      "speech_examples": [
+        "鍵をありがとうございます"
+      ],
+      "notes": "普通の人間"
+    },
+    {
+      "name": "管理人",
+      "persona": "親切",
+      "appearance": "白髪",
+      "speech_examples": [
+        "この鍵をどうぞ"
+      ],
+      "notes": ""
+    }
+  ],
+  "settings": [
+    {
+      "name": "廊下",
+      "kind": "place",
+      "notes": "部屋の前"
+    },
+    {
+      "name": "部屋",
+      "kind": "place",
+      "notes": "鐘とNASAの模型がある。扉以外は隙間のない壁"
+    }
+  ],
+  "scenes": [
+    {
+      "name": "鍵",
+      "opening": {
+        "place": "廊下",
+        "time_of_day": "昼",
+        "weather": "晴れ"
+      },
+      "beats": [
+        "管理人が葵へ鍵を渡す"
+      ],
+      "covers": [
+        1
+      ],
+      "target_chars": 1000
+    },
+    {
+      "name": "入室と鐘",
+      "opening": {
+        "place": "廊下",
+        "time_of_day": "昼",
+        "weather": "晴れ"
+      },
+      "beats": [
+        "葵が鍵で扉を開けて部屋へ入る",
+        "葵がNASAの模型を眺め鐘を鳴らす"
+      ],
+      "covers": [
+        2,
+        3
+      ],
+      "target_chars": 1000
+    }
+  ]
+}

@@ -7,7 +7,7 @@
       "concept":   {"model": "qwen3.6-35b-a3b", "thinking": null},
       "structure": {"model": "qwen3.6-35b-a3b", "thinking": null},
       "writing":   {"model": "gemma-4-26b-a4b", "thinking": null},
-      "check":     {"model": "qwen3.6-35b-a3b", "thinking": null},
+      "check":     {"model": "gemma-4-26b-a4b", "thinking": null},
       "baseline":  {"model": "gemma-4-26b-a4b", "thinking": null}
     }
   },

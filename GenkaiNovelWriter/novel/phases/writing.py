@@ -3,7 +3,7 @@
 import sys
 from pathlib import Path
 
-from novel import run
+from novel import checks, run
 from novel.context import load_novel, writing_messages
 from novel.phases.structure import load_plot
 from novel.schema import Novel, Plot
@@ -27,7 +27,7 @@ def assemble(directory: Path | str, plot: Plot) -> Novel:
     (Path(directory) / run.DRAFT).write_text(text + "\n", encoding="utf-8")
     total = 0
     for scene in novel.scenes:
-        count = sum(not char.isspace() for char in scene.content)
+        count = checks.character_count(scene.content)
         total += count
         print(f"scene_{scene.index:02d}: {count}字")
         if count < 600:

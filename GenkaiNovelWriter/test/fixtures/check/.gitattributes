@@ -1,0 +1,6 @@
+# Preserve historical source bytes (including CRCRLF) and recorded hashes.
+# Corpus whitespace is checked by the immutable manifest, not reformatted.
+* -text -whitespace
+README.md whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+manifest.json whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+.gitattributes whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
