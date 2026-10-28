@@ -7,8 +7,9 @@ LM Studio と OpenRouter の差は base_url / api_key / model だけなので、
 from pathlib import Path
 from time import perf_counter
 from typing import Any
+from uuid import uuid4
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from util.log import append_call
 from util.models import prepare_local_model
@@ -37,6 +38,8 @@ class OpenAICompatibleGateway:
         self.request_body = dict(request_body or {})
         self.log_path = Path(log_path)
         self.last_response = None
+        self.last_call_id = None
+        self.last_error_code = None
         self.scene_index = None
         # 注入されたクライアントは接続先・モデル管理も呼び出し側が担う(オフラインテスト等)。
         self._prepare_model = client is None and backend == "local"
@@ -71,6 +74,13 @@ class OpenAICompatibleGateway:
     # ---- 内部 ----
 
     def _request(self, messages: list, *, response_schema=None, model_cls=None):
+        from novel.history import CURRENT
+        operation = CURRENT.get()
+        self.last_call_id = uuid4().hex
+        self.last_error_code = None
+        if operation is not None:
+            operation.call_ids.append(self.last_call_id)
+            operation.last_error_code = None
         started = perf_counter()
         response = None
         self.last_response = None
@@ -92,17 +102,26 @@ class OpenAICompatibleGateway:
             response = self.client.chat.completions.create(**arguments)
             self.last_response = response
             if not response.choices:
+                self.last_error_code = "no_choices"
                 raise GenerationError("Response has no choices.")
             choice = response.choices[0]
             if choice.finish_reason != "stop":
+                self.last_error_code = "non_stop_finish"
                 raise GenerationError("Generation did not finish normally.")
             if not isinstance(choice.message.content, str) or not choice.message.content.strip():
+                self.last_error_code = "empty_content"
                 raise GenerationError("Response has no text content.")
             if model_cls is not None:
                 return model_cls.model_validate_json(choice.message.content)
             return response
         except BaseException as error:
             error_type = type(error).__name__
+            if self.last_error_code is None:
+                self.last_error_code = ("schema_invalid" if isinstance(error, ValidationError)
+                                        else "interrupted" if isinstance(error, (KeyboardInterrupt, SystemExit))
+                                        else "request_failed")
+            if operation is not None:
+                operation.last_error_code = self.last_error_code
             # 数値の usage だけ拾う。エラー本文・ヘッダ・鍵はログに書かない。
             body = getattr(error, "body", None)
             if isinstance(body, dict) and isinstance(body.get("usage"), dict):
@@ -126,7 +145,13 @@ class OpenAICompatibleGateway:
 
             output_tokens = tokens("completion_tokens")
             stats = getattr(response, "stats", None)
+            choices = getattr(response, "choices", None)
+            finish = choices[0].finish_reason if choices else None
+            if finish not in (None, "stop", "length", "tool_calls", "function_call", "content_filter"):
+                finish = "unknown"
             append_call(self.log_path, {
+                "operation_id": operation.id if operation else None, "call_id": self.last_call_id,
+                "finish_reason": finish, "error_code": self.last_error_code,
                 "phase": self.phase, "backend": self.backend,
                 "scene": self.scene_index,
                 "model": self.model, "thinking": self.thinking,

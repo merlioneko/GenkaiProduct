@@ -62,6 +62,8 @@ def save_plot_report(directory: Path | str, report: PlotReport) -> Path:
     path = Path(directory) / run.PLOT_REPORT
     path.write_text(json.dumps(report.model_dump(), ensure_ascii=False, indent=2) + "\n",
                     encoding="utf-8")
+    from novel.history import record_output
+    record_output(path)
     return path
 
 

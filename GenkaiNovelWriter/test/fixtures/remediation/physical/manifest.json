@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "status": "human_approved_2026-10-27",
+  "source": "2026-10-27に新規作成した合成例。実モデル出力ではない",
+  "candidate_prompt": "../physical-candidate.md",
+  "cases": [
+    {
+      "id": "tune-normal",
+      "split": "tuning",
+      "kind": "synthetic",
+      "known_issues": [],
+      "rationale": "受領して保持した鍵を順に取り出して使用できる",
+      "files": {
+        "00_input.txt": "21d5cfc70812f392344c6008283823842f725ca4aeb896476f3bc0826015e4fa",
+        "03_plot.json": "da0d47ca8eafe37b0d9c1cfbe5d9f11e7d4849f3ce00fa91db776517dd4c45fd",
+        "04_scenes/scene_01.md": "402bc07aa6d5047407cd6e2d2bf992e2b2c41addf872c5519a5aa4c0779715d0",
+        "05_draft.md": "e26e8fd49931acc754229a3773423f5314c679dc1b02f5e4c8ca295950031168"
+      }
+    },
+    {
+      "id": "holdout-normal",
+      "split": "holdout",
+      "kind": "synthetic",
+      "known_issues": [],
+      "rationale": "持ち物を置いた後なので両手が空いている",
+      "files": {
+        "00_input.txt": "eb9e885dda6caab6521df56523835a4df25bf1a81943f9fcba1ae6ecf1c7dcb2",
+        "03_plot.json": "60e4533d23ebd3aad5554cfdf10adc4df6fda697e1371c454453dde3d821474d",
+        "04_scenes/scene_01.md": "7f5cd2ad05ea5c4b1510dd84420d53472635c7b1428d5793fc65b22d52a27864",
+        "05_draft.md": "24e054f3703bfefa937a129850d7b7dc31b8aa00a094a09c59681c116e7dcd8e"
+      }
+    },
+    {
+      "id": "tune-impossible",
+      "split": "tuning",
+      "kind": "synthetic",
+      "known_issues": [
+        {
+          "id": "PT01",
+          "scene": 1,
+          "quote": "空いている右手",
+          "reason": "右手で箱を保持したままなのに同時に右手が空いているという記述は両立しない"
+        }
+      ],
+      "rationale": "同じ右手の占有状態の直接的矛盾",
+      "files": {
+        "00_input.txt": "07f039e332495fc5aeba538472e44c42cba4316a51486ace317922808d07bf19",
+        "03_plot.json": "c3b35af5aefc1b7e0b7d9f128de6b0d6eae7a927e2e25b658cecd84f494740fa",
+        "04_scenes/scene_01.md": "1bcfbc644fab6daa151473a1ec45cfaf975bd0f5735a95b1a124caf4475b0cd4",
+        "05_draft.md": "6c683606a3935dcffc49011a7d918f9b5fb06de6edeb614db07feaf2bbc1f537"
+      }
+    },
+    {
+      "id": "holdout-impossible",
+      "split": "holdout",
+      "kind": "synthetic",
+      "known_issues": [
+        {
+          "id": "PH01",
+          "scene": 1,
+          "quote": "その槌の尖った先端",
+          "reason": "同じ槌に尖った部分がないと明示した直後に尖った先端があるとする物性は両立しない"
+        }
+      ],
+      "rationale": "道具の先端の形状の直接的矛盾",
+      "files": {
+        "00_input.txt": "d64513f345254ae249614ab6273dd42d60526315bfdcd0056c77f25baa3f81b0",
+        "03_plot.json": "fc4ff63689ff61608df0b1e224175da5690d596a944ad27a9274525dd1f42470",
+        "04_scenes/scene_01.md": "72eb19dee71fb3941ce5367e3561a89a25d4dc8b6d8f9c09d6ae618aef92788e",
+        "05_draft.md": "8e06034a5427aeda923d577270ff62549635b0bf1aad19291bb2f1abdb361678"
+      }
+    },
+    {
+      "id": "tune-magic",
+      "split": "tuning",
+      "kind": "synthetic",
+      "known_issues": [],
+      "rationale": "設定で明示的に許可した通過能力が成立する",
+      "files": {
+        "00_input.txt": "419bb92d7dd54a71172cb140f1be04f361ed6227ab6cea9b8d4f7c6635ebd9bc",
+        "03_plot.json": "d5645c16c1fecd8d4f4b8cfc5994ab051022ca24bed3d3c947f50a1ea303f6c9",
+        "04_scenes/scene_01.md": "0bbd21bda7c48830ff8b6082cb0bcff47ead5e49fa9dec79bcbc3a6b6d5fc9e6",
+        "05_draft.md": "9a2675d3d6b8db1a2a62f3264097dbf75042284a14c0d5becb357c934671bc07"
+      }
+    },
+    {
+      "id": "holdout-exaggeration",
+      "split": "holdout",
+      "kind": "synthetic",
+      "known_issues": [],
+      "rationale": "明示された比喩であり身体の脱落という事実を述べていない",
+      "files": {
+        "00_input.txt": "29ebf07d39659eae5c203eee2db8c2ac17e534207e0e31c36ee282b1db3403b6",
+        "03_plot.json": "318000c723d7d090429de956874c3c6ac8f7e044a467bed6e3b02d73bc95c8de",
+        "04_scenes/scene_01.md": "0d5d46c4e42dafad9f7aed8e5d12620d45f51663b3217eb4a29317633cb84375",
+        "05_draft.md": "f0c774e1bb203fc4217a70973e9e02034b38611d6dd42b0cbd4bc34d860d71dc"
+      }
+    }
+  ]
+}

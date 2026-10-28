@@ -75,7 +75,12 @@ class SchemaTest(unittest.TestCase):
         data = {"item": "physical", "issues": [{"scene": 3, "quote": "抜粋", "reason": "説明"}]}
         result = CheckResult.model_validate(data)
         self.assertEqual(json.loads(result.model_dump_json()), data)
-        self.assertEqual(CheckResult(item="length").issues, [])
+        self.assertEqual(CheckResult(item="length", issues=[]).issues, [])
+        self.assertIn("issues", CheckResult.model_json_schema()["required"])
+        for data in ({"item": "elements"}, {"item": "elements", "issues": None},
+                     {"item": "elements", "issues": {}}):
+            with self.assertRaises(ValidationError):
+                CheckResult.model_validate(data)
 
 
 if __name__ == "__main__":

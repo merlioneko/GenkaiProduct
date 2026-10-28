@@ -9,6 +9,8 @@ import sys
 from pathlib import Path
 
 from novel import checks, evaluation, run
+from novel.history import Operation, digest, read_source, record_output
+from novel.context import complete_novel, draft_text
 from novel.phases import concept as concept_phase
 from novel.phases import structure as structure_phase
 from novel.phases import writing as writing_phase
@@ -31,7 +33,7 @@ def baseline(input_path: Path, *, config_path=DEFAULT_CONFIG, backend="local",
              thinking_options=None, output_root=None, timeout=600,
              gateway_factory=OpenAICompatibleGateway) -> Path:
     """一発生成(U1 の比較用)。creations/baseline-*/ に 00_input.txt・baseline.md・calls.jsonl を書く。"""
-    idea = Path(input_path).read_text(encoding="utf-8")
+    idea, _ = read_source(Path(input_path))
     if not idea.strip():
         raise ValueError("Input must not be empty.")
     config = load_backend(config_path, backend)
@@ -40,14 +42,19 @@ def baseline(input_path: Path, *, config_path=DEFAULT_CONFIG, backend="local",
     prompt = (PROJECT_ROOT / "prompts/baseline/system.md").read_text(encoding="utf-8")
 
     directory = create_output_dir(Path(output_root or CREATIONS), "baseline-")
-    (directory / "00_input.txt").write_text(idea, encoding="utf-8")
-    with gateway_factory(
-        model=phase.model, base_url=config.base_url, api_key=config.api_key.get_secret_value(),
-        phase="baseline", backend=backend, thinking=phase.thinking, request_body=body,
-        log_path=directory / "calls.jsonl", timeout=timeout,
-    ) as gateway:
-        text = gateway.text(create_messages(system=prompt, user=idea))
-    (directory / "baseline.md").write_text(text, encoding="utf-8")
+    (directory / run.INPUT).write_text(idea, encoding="utf-8")
+    with Operation(directory, "baseline", config=config, backend=backend, new=True,
+                   inputs={run.INPUT: digest((directory / run.INPUT).read_bytes())},
+                   prompts={"prompts/baseline/system.md": prompt}, request_bodies={"baseline": body}) as operation:
+        operation.step = "baseline"
+        with gateway_factory(
+            model=phase.model, base_url=config.base_url, api_key=config.api_key.get_secret_value(),
+            phase="baseline", backend=backend, thinking=phase.thinking, request_body=body,
+            log_path=directory / "calls.jsonl", timeout=timeout,
+        ) as gateway:
+            text = gateway.text(create_messages(system=prompt, user=idea))
+        (directory / "baseline.md").write_text(text, encoding="utf-8")
+        record_output(directory / "baseline.md")
     return directory
 
 
@@ -68,21 +75,44 @@ def stage(name: str, *, run_dir=None, input_path=None, config_path=DEFAULT_CONFI
     if name not in ("concept", "structure"):
         raise run.RunError(f"Unknown stage: {name}")
     config = load_backend(config_path, backend)
-    if name == "concept" and run_dir is None:
-        directory = run.create_run(input_path, output_root=output_root)
+    new = name == "concept" and run_dir is None
+    if name == "concept":
+        if new:
+            idea, _ = read_source(Path(input_path))
+        else:
+            directory = run.open_run(run_dir)
+            idea, fingerprint = read_source(directory / run.INPUT)
+        prepared = concept_phase.prepare_concept(idea, config, thinking_options)
+        if new:
+            directory = run.create_run(input_path, output_root=output_root, idea=idea)
+            fingerprint = digest((directory / run.INPUT).read_bytes())
+        inputs = None
+        hashes = {run.INPUT: fingerprint}
+        prompts = {"prompts/concept/system.md": prepared.system,
+                   "prompts/concept/verify.md": prepared.verify_system}
     else:
         directory = run.open_run(run_dir)
-    run.archive_downstream(directory, name)
-    run.save_config_snapshot(directory, backend, config)
+        prepared = structure_phase.prepare_structure(config, thinking_options)
+        inputs = structure_phase.prepare_input(directory)
+        hashes = inputs[2]
+        prompts = {"prompts/structure/system.md": prepared.system}
     options = {"backend": backend, "thinking_options": thinking_options,
-               "timeout": timeout, "gateway_factory": gateway_factory}
+               "timeout": timeout, "gateway_factory": gateway_factory, "prepared": prepared}
 
-    if name == "concept":
-        concept_phase.run_concept(directory, config, **options)
-        concept_phase.verify_concept(directory, config, **options)
-    else:
-        plot = structure_phase.run_structure(directory, config, **options)
-        checks.save_plot_report(directory, checks.check_plot(plot))
+    with Operation(directory, f"stage {name}", config=config, backend=backend, new=new,
+                   inputs=hashes, prompts=prompts, request_bodies={name: prepared.body}) as operation:
+        operation.step = "archive"
+        operation.archive = run.archive_downstream(directory, name)
+        if new:
+            run.save_config_snapshot(directory, backend, config)
+        operation.step = name
+        if name == "concept":
+            concept_phase.run_concept(directory, config, **options)
+            operation.step = "concept_verify"
+            concept_phase.verify_concept(directory, config, **options)
+        else:
+            plot = structure_phase.run_structure(directory, config, inputs=inputs, **options)
+            checks.save_plot_report(directory, checks.check_plot(plot))
     return directory
 
 
@@ -91,20 +121,34 @@ def run_pipeline(input_path: Path, *, config_path=DEFAULT_CONFIG, backend="local
                  gateway_factory=OpenAICompatibleGateway) -> Path:
     """新しい実行ディレクトリで生成部分を一括実行する。失敗時は後続を呼ばない。"""
     config = load_backend(config_path, backend)
-    options = load_thinking_options(thinking_options)
-    for name in ("concept", "structure", "writing"):
-        thinking_body(options, config.phase(name))
-    directory = run.create_run(input_path, output_root=output_root)
+    idea, _ = read_source(Path(input_path))
+    concept = concept_phase.prepare_concept(idea, config, thinking_options)
+    structure = structure_phase.prepare_structure(config, thinking_options)
+    writing = writing_phase.prepare_writing(config, thinking_options)
+    directory = run.create_run(input_path, output_root=output_root, idea=idea)
     print(f"Run: {directory}", file=sys.stderr, flush=True)
-    run.save_config_snapshot(directory, backend, config)
     arguments = {"backend": backend, "thinking_options": thinking_options,
                  "timeout": timeout, "gateway_factory": gateway_factory}
-    concept_phase.run_concept(directory, config, **arguments)
-    concept_phase.verify_concept(directory, config, **arguments)
-    plot = structure_phase.run_structure(directory, config, **arguments)
-    checks.save_plot_report(directory, checks.check_plot(plot))
-    writing_phase.run_writing(directory, config, **arguments)
-    evaluation.save_template(directory)
+    with Operation(directory, "run", config=config, backend=backend, new=True,
+                   inputs={run.INPUT: digest((directory / run.INPUT).read_bytes())},
+                   prompts={"prompts/concept/system.md": concept.system,
+                            "prompts/concept/verify.md": concept.verify_system,
+                            "prompts/structure/system.md": structure.system,
+                            "prompts/writing/system.md": writing.system},
+                   request_bodies={"concept": concept.body, "structure": structure.body,
+                                   "writing": writing.body}) as operation:
+        run.save_config_snapshot(directory, backend, config)
+        operation.step = "concept"
+        concept_phase.run_concept(directory, config, prepared=concept, **arguments)
+        operation.step = "concept_verify"
+        concept_phase.verify_concept(directory, config, prepared=concept, **arguments)
+        operation.step = "structure"
+        plot = structure_phase.run_structure(directory, config, prepared=structure, **arguments)
+        checks.save_plot_report(directory, checks.check_plot(plot))
+        operation.step = "writing"
+        writing_phase.run_writing(directory, config, prepared=writing, **arguments)
+        operation.step = "evaluation"
+        evaluation.save_template(directory)
     return directory
 
 
@@ -114,24 +158,56 @@ def write(run_dir: Path | str, *, first: int = 1, config_path=DEFAULT_CONFIG,
     """シーン k 以降を退避・再生成し、Assemble まで実行する。"""
     config = load_backend(config_path, backend)
     directory = run.open_run(run_dir)
-    plot = structure_phase.load_plot(directory)
-    writing_phase.validate_start(directory, plot, first)
-    thinking_body(load_thinking_options(thinking_options), config.phase("writing"))
+    prepared = writing_phase.prepare_writing(config, thinking_options)
+    inputs = writing_phase.prepare_input(directory, first)
     # --from 1 は stage writing と同じ範囲(04 全体)を退避する。
-    if first == 1:
-        run.archive_downstream(directory, "writing")
-    else:
-        run.archive_from_scene(directory, first)
-    run.save_config_snapshot(directory, backend, config)
-    writing_phase.run_writing(directory, config, first=first, backend=backend,
-                              thinking_options=thinking_options, timeout=timeout,
-                              gateway_factory=gateway_factory)
+    with Operation(directory, "write", config=config, backend=backend, first=first,
+                   inputs=inputs[2], prompts={"prompts/writing/system.md": prepared.system},
+                   request_bodies={"writing": prepared.body}) as operation:
+        operation.step = "archive"
+        operation.archive = (run.archive_downstream(directory, "writing") if first == 1
+                             else run.archive_from_scene(directory, first))
+        operation.step = "writing"
+        writing_phase.run_writing(directory, config, first=first, backend=backend,
+                                  thinking_options=thinking_options, timeout=timeout,
+                                  gateway_factory=gateway_factory, prepared=prepared, inputs=inputs)
+    return directory
+
+
+def assemble(run_dir: Path | str) -> Path:
+    """04を正として再結合する。毎回古い評価を退避して未評価へ戻す(D55)。"""
+    directory = run.open_run(run_dir)
+    idea, fingerprint = read_source(directory / run.INPUT)
+    if not idea.strip():
+        raise run.RunError("Input must not be empty.")
+    hashes = {run.INPUT: fingerprint}
+    plot = structure_phase.load_plot(directory, fingerprints=hashes)
+    novel = complete_novel(directory, plot, fingerprints=hashes)
+    draft, template = draft_text(novel), evaluation.render_template(plot)
+    with Operation(directory, "assemble", inputs=hashes) as operation:
+        saved = []
+        try:
+            operation.step = "archive"
+            operation.archive = run.archive_downstream(directory, "assemble")
+            operation.step = "save_draft"
+            run.atomic_write(directory / run.DRAFT, draft)
+            saved.append(run.DRAFT)
+            operation.step = "save_evaluation"
+            run.atomic_write(directory / run.EVAL, template)
+            saved.append(run.EVAL)
+        except OSError:
+            raise run.RunError(f"Assemble save failed; archive: {operation.archive}; saved: {saved}.") from None
+        writing_phase.show_lengths(novel)
     return directory
 
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="GenkaiNovelWriter")
     commands = parser.add_subparsers(dest="command", required=True)
+
+    assemble_help = "保存済み04を再結合する。毎回旧05/06/07を退避し、評価を未評価へ戻す"
+    command = commands.add_parser("assemble", help=assemble_help, description=assemble_help)
+    command.add_argument("--run", type=Path, dest="run_dir", required=True)
 
     command = commands.add_parser("run", help="生成部分を一括実行し、人手評価テンプレートを保存する")
     command.add_argument("--input", type=Path, required=True)
@@ -180,7 +256,9 @@ def main(argv=None) -> int:
             parser.error(f"stage {args.phase} does not accept --input.")
 
     try:
-        if args.command == "run":
+        if args.command == "assemble":
+            directory = assemble(args.run_dir)
+        elif args.command == "run":
             directory = run_pipeline(args.input, config_path=args.config, backend=args.backend,
                                      thinking_options=args.thinking_options, timeout=args.timeout)
         elif args.command == "baseline":
@@ -204,7 +282,7 @@ def main(argv=None) -> int:
               file=sys.stderr)
         return 1
     print(directory)
-    if args.backend == "remote":
+    if getattr(args, "backend", None) == "remote":
         print("OpenRouter: 動作確認専用。品質評価には使用しない。")
     return 0
 

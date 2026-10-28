@@ -29,6 +29,34 @@ uv を使わない場合は、別途セキュリティ修正済み Python を導
 
 `-t .` は必須(`test` をパッケージとして読ませるため)。実際の OpenAI SDK にメモリ上の HTTP トランスポートを注入するので、LM Studio・OpenRouter へは通信しない。
 
+### M6後修正の回帰確認
+
+`test_remediation.py` は実SDKへのメモリHTTP応答で、issuesの必須性、退避前検証、項目別失敗診断、空の指定リスト、再結合、操作履歴を確認する。全体テストには既存のM5/M6比較スクリプトの互換性テストも含む。実モデル確認・人手照合の結果は[MILESTONES](../MILESTONES.md#remediation-after-m6)へ記録する。
+
+サンドボックスの既定一時領域でアクセス拒否が起きる場合は、作業ディレクトリ内の空の検証用領域を使用する。これは実機検証条件の変更ではない。
+
+```powershell
+New-Item -ItemType Directory -Force creations/test-tmp | Out-Null
+$env:TEMP = (Resolve-Path creations/test-tmp).Path
+$env:TMP = $env:TEMP
+.\.venv\Scripts\python.exe -m unittest test.test_remediation -v
+```
+
+### 手編集後の再結合と来歴
+
+```powershell
+.\.venv\Scripts\python.exe main.py assemble --run creations/<run-directory>
+.\.venv\Scripts\python.exe main.py stage check --run creations/<run-directory>
+```
+
+`assemble` は04を正として全シーンを検証・再結合する。バックエンド設定もモデルも不要。毎回旧05/06/07を同じアーカイブへ退避し、新07は未評価となる。同じ本文でも評価を再開始するため、記入済み07は退避先から確認する。05だけを編集した場合は04へ変更を移してから実行する。途中シーンの変更が後続へ影響する場合は `write --from <次のシーン>` で後続を再生成する。
+
+新規01は開始時の設定として保持する。各操作の条件は `_history/<operation-id>/start.json`、退避先・部分出力・結果は `result.json`、呼び出しはcallsのoperation_id/call_idで照合する。inputs/outputsはファイルのバイト列、promptsは実際に供給したUTF-8テキストのSHA-256。思考用リクエスト本文は指紋のみを保存する。context_lengthは設定値であり実ロード長の観測ではない。
+
+入力のinput_provenanceがexternal_or_unknownなら外部変更または来歴不明で、過去の生成設定をそのまま帰属させない。resultがなければ完了未確認。`novel.history.operation_statuses` でも区別できる。旧runの初回操作にはmigration.jsonで導入時の公開設定と現存ファイルの指紋を残すが、元の生成条件・外部編集の作者や時刻は復元しない。旧01・アーカイブ・callsと固定済みM5/M6 studyは書き換えない。
+
+Checkのmetadataと報告書にはpending/running/success/errorと失敗段階・呼び出しIDを残す。callsのsuccessは応答とスキーマ検証までの成功で、引用照合までの成功ではない。引用不一致は項目側のerror/quote_validation/quote_mismatchで確認する。finish_reason/error_codeがない旧callsへ値を推測で補完しない。
+
 ## 3. バックエンド設定
 
 `config/backends.example.json` を `.env/backends.json` にコピーし、`phases.*.model` を LM Studio 上の実際の識別子に置き換える。
@@ -186,3 +214,18 @@ prepareは本文や検査結果を生成せず、既知一覧・資料ハッシ�
 失敗した試行もresults.jsonへ保持し、再度executeしても自動再試行しない。条件・資料・保存済み出力の変更は停止する。再試行が必要なら理由を記録して別studyを作る。採取途中で中断したrunningの試行も再利用しない。human_review.json/mdは既存なら上書きしない。
 
 人手で全指摘を既知IDに対応付け、誤検出・新規の妥当な指摘・重複・保留を区別する。引用の一致だけでTPにしない。未列挙の実出力指摘を自動FPにしない。既知IDの採否と根拠はモデル間で揃え、confirmed=trueはその項目の見逃しを含む照合完了後だけ設定する。summarizeは人手対応付けから項目別TP/FP/FN/検出率をmetrics.jsonへ集計し、未評価・失敗・未実行はnull/未確定のまま残す。採用・保留・不採用はD45に従いユーザが理由・限界・次の対応を記録する。[M6記録](../MILESTONES.md#milestone-m6)に結果を反映し、M6の完了を実装テストだけで宣言しない。
+
+## M6後の検出性能評価（F）
+
+[評価計画](../docs/post-m6-detection-evaluation-plan.md)と正解資料の人手確認を済ませてから、新しいstudyへ採取する。以下のスクリプトは実際にロードしたモデル名・16384等の長さと設定を照合し、不一致なら生成前に停止する。通常CLIの自動ロード仕様を変更するものではない。
+
+```powershell
+.\.venv\Scripts\python.exe test/measure_concept.py prepare --study creations/<new-u13-study> --config <verification-config> --evaluator ユーザ
+.\.venv\Scripts\python.exe test/measure_concept.py execute --study creations/<new-u13-study> --config <verification-config>
+.\.venv\Scripts\python.exe test/compare_physical.py prepare --study creations/<new-physical-study> --config <verification-config> --evaluator ユーザ
+.\.venv\Scripts\python.exe test/compare_physical.py execute --study creations/<new-physical-study> --config <verification-config>
+```
+
+Conceptはconcept担当の現行Qwen、physicalはwriting担当と同じGemmaの明示識別子を使う。事前にLM Studioのロードを合わせる。`prepare`は計画・正解・資料・プロンプト・コード・条件・観測を固定する。`execute`は承認した16/44試行を一度ずつ採取し、失敗試行も上書き・自動再試行しない。physicalは調整用32件→最終確認用12件の順で、旧/候補の順序を2巡目に反転する。結果がないrunningの試行も完了扱いにしない。
+
+`results.json`と各試行のcalls・生出力・構造化結果・履歴を確認し、`human_review.md`で正解原因へ対応付ける。API/形式失敗を指摘なしへ置換しない。採取スクリプトは本番プロンプトを更新・自動採点しない。既存M6の5資料とR02の許容判断を保持し、過去の実測値を今回の旧版対照群へ流用しない。

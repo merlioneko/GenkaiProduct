@@ -1,0 +1,48 @@
+{
+  "meta": {
+    "genre": "コメディ",
+    "tone": "軽快",
+    "style": "三人称",
+    "pov": "蓮"
+  },
+  "constraints": [],
+  "events": [],
+  "characters": [
+    {
+      "name": "蓮",
+      "persona": "落ち着いた人物",
+      "appearance": "普段着",
+      "speech_examples": [
+        "そうか"
+      ],
+      "notes": ""
+    }
+  ],
+  "settings": [
+    {
+      "name": "台所",
+      "kind": "place",
+      "notes": ""
+    },
+    {
+      "name": "世界の法則",
+      "kind": "worldrule",
+      "notes": "日常のコメディ。身体は現実の人間で、驚きを比喩で誇張する。"
+    }
+  ],
+  "scenes": [
+    {
+      "name": "動作の場面",
+      "opening": {
+        "place": "台所",
+        "time_of_day": "昼",
+        "weather": "晴れ"
+      },
+      "beats": [
+        "蓮が台所で驚き、その後口を閉じて話す"
+      ],
+      "covers": [],
+      "target_chars": 1000
+    }
+  ]
+}

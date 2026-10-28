@@ -3,12 +3,32 @@
 import json
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG = PROJECT_ROOT / ".env" / "backends.json"
 PHASES = ("concept", "structure", "writing", "check", "baseline")
+
+
+def public_url(value: str) -> str:
+    """認証情報・クエリ・フラグメントを公開記録へ持ち込まない。"""
+    try:
+        parts = urlsplit(value)
+        host = parts.hostname or ""
+        if ":" in host:
+            host = f"[{host}]"
+        authority = host + (f":{parts.port}" if parts.port else "")
+        return urlunsplit((parts.scheme, authority, parts.path, "", ""))
+    except ValueError:
+        return "unavailable"
+
+
+def public_config(config, backend: str) -> dict:
+    return {"backend": backend, "base_url": public_url(config.base_url),
+            "context_length": config.context_length,
+            "phases": {name: phase.model_dump() for name, phase in config.phases.items()}}
 
 
 class ConfigError(ValueError):

@@ -87,9 +87,14 @@ class ConceptFormatTest(unittest.TestCase):
         with self.assertRaises(phase.ConceptFormatError):
             phase.parse_concept(SAMPLE.replace("1. 魔人", "- 魔人"))
 
-    def test_empty_sections_are_rejected(self):
-        with self.assertRaises(phase.ConceptFormatError):
-            phase.parse_concept("# 制約\n\n# 出来事\n1. a\n\n# 構想\n本文\n")
+    def test_empty_lists_round_trip_but_empty_body_or_items_are_rejected(self):
+        for constraints, events in (([], ["出会う"]), (["静かな話"], []), ([], [])):
+            original = Concept(constraints=constraints, events=events, body="本文")
+            self.assertEqual(phase.parse_concept(phase.render_concept(original)), original)
+        for invalid in ("# 制約\n- \n# 出来事\n# 構想\n本文",
+                        "# 制約\n# 出来事\n1. \n# 構想\n本文"):
+            with self.assertRaises(phase.ConceptFormatError):
+                phase.parse_concept(invalid)
         with self.assertRaises(phase.ConceptFormatError):
             phase.parse_concept("# 制約\n- a\n\n# 出来事\n1. a\n\n# 構想\n\n")
 

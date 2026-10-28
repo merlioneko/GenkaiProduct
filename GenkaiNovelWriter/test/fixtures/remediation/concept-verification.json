@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "status": "human_approved_2026-10-27",
+  "source": "2026-10-27に作成した合成例。既知実出力の原文ではない",
+  "cases": [
+    {
+      "id": "missing-normal",
+      "pair": "missing",
+      "input": "葵と蓮は赤い傘を持って港で再会する。",
+      "concept": {"constraints": [], "events": ["葵と蓮は赤い傘を持って港で再会する"], "body": "港に赤い傘を携えた葵と蓮が現れ、久しぶりに顔を合わせる。"},
+      "expected": {"abnormal": false, "kind": null, "reason": "人物・傘の色・場所・再会を意味の変わらない言い換えで保持"}
+    },
+    {
+      "id": "missing-abnormal",
+      "pair": "missing",
+      "input": "葵と蓮は赤い傘を持って港で再会する。",
+      "concept": {"constraints": [], "events": ["葵と蓮は港で再会する"], "body": "港に葵と蓮が現れ、久しぶりに顔を合わせる。"},
+      "expected": {"abnormal": true, "kind": "missing", "cause": "red-umbrella", "reason": "赤い傘を持つ指定がリストにも構想本文にもない"}
+    },
+    {
+      "id": "reordered-normal",
+      "pair": "reordered",
+      "input": "葵が港で鍵を受け取り、その鍵で倉庫を開ける。",
+      "concept": {"constraints": [], "events": ["葵が港で鍵を受け取る", "葵が受け取った鍵で倉庫を開ける"], "body": "葵は港で鍵を受領した後、その鍵を使って倉庫を解錠する。"},
+      "expected": {"abnormal": false, "kind": null, "reason": "受領→使用の順序を保持。受領/解錠は意味の変わらない言い換え"}
+    },
+    {
+      "id": "reordered-abnormal",
+      "pair": "reordered",
+      "input": "葵が港で鍵を受け取り、その鍵で倉庫を開ける。",
+      "concept": {"constraints": [], "events": ["葵が港で鍵を受け取る", "葵が受け取った鍵で倉庫を開ける"], "body": "葵はまだ受け取っていないその鍵で先に倉庫を開け、それから港で鍵を受け取る。"},
+      "expected": {"abnormal": true, "kind": "reordered", "cause": "key-order", "reason": "指定リストは正しいが構想本文の受領と使用が逆。所有の不整合も同じ原因として重複加算しない"}
+    },
+    {
+      "id": "weakened-normal",
+      "pair": "weakened",
+      "input": "凍えるほど寒い雪の町を舞台にした静かな短編。",
+      "concept": {"constraints": ["凍えるほど寒い雪の町が舞台", "静かな短編"], "events": [], "body": "雪の町は身を凍らせる寒さだ。人物たちは言葉少なに、小さな暖炉を囲んで静かに過ごす。"},
+      "expected": {"abnormal": false, "kind": null, "reason": "寒さの強さ・雪の町・静かな雰囲気を保持。出来事なしは正常"}
+    },
+    {
+      "id": "weakened-abnormal",
+      "pair": "weakened",
+      "input": "凍えるほど寒い雪の町を舞台にした静かな短編。",
+      "concept": {"constraints": ["凍えるほど寒い雪の町が舞台", "静かな短編"], "events": [], "body": "雪の町は少し肌寒いだけで、凍えるような寒さではない。人物たちは静かに過ごす。"},
+      "expected": {"abnormal": true, "kind": "weakened", "cause": "cold-intensity", "reason": "指定リストは正しいが本文では寒さの強さが明示的に弱化。alteredとしての妥当な説明も人手で同原因の指摘と判断する候補"}
+    },
+    {
+      "id": "altered-normal",
+      "pair": "altered",
+      "input": "蓮が葵に襲いかかり、葵は逃げる。",
+      "concept": {"constraints": [], "events": ["蓮が葵に襲いかかる", "葵が逃げる"], "body": "蓮に襲われた葵は、その場から逃げ出す。"},
+      "expected": {"abnormal": false, "kind": null, "reason": "受動態でも主体・動作・受け手・逃げる人物を保持"}
+    },
+    {
+      "id": "altered-abnormal",
+      "pair": "altered",
+      "input": "蓮が葵に襲いかかり、葵は逃げる。",
+      "concept": {"constraints": [], "events": ["蓮が葵に襲いかかる", "葵が逃げる"], "body": "葵が蓮に襲いかかり、蓮はその場から逃げ出す。"},
+      "expected": {"abnormal": true, "kind": "altered", "cause": "roles-reversed", "reason": "指定リストは正しいが本文だけ加害・被害・逃げる人物が逆。同じ主体逆転の原因として重複加算しない"}
+    }
+  ]
+}

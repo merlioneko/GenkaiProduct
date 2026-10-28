@@ -149,7 +149,7 @@ class RunDirectoryTest(unittest.TestCase):
     def test_unknown_stage_is_rejected(self):
         directory = self.make_run()
         with self.assertRaises(run.RunError):
-            run.archive_downstream(directory, "assemble")
+            run.archive_downstream(directory, "unknown")
 
 
 if __name__ == "__main__":

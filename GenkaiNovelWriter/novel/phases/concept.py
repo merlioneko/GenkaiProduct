@@ -6,11 +6,13 @@ LLM にもこの形式で書かせ、書かれたものをパースして Concep
 """
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 from novel import run
+from novel.history import record_output
 from novel.schema import Concept, ConceptReport
-from util.config import PROJECT_ROOT, BackendConfig, load_thinking_options, thinking_body
+from util.config import PROJECT_ROOT, BackendConfig, PhaseConfig, load_thinking_options, thinking_body
 from util.gateway import OpenAICompatibleGateway, create_messages
 
 SYSTEM_PROMPT = PROJECT_ROOT / "prompts/concept/system.md"
@@ -24,6 +26,24 @@ BODY_HEADING = "# 構想"
 
 class ConceptFormatError(ValueError):
     """02_concept.md が固定見出しの形式になっていない。"""
+
+
+@dataclass(frozen=True)
+class ConceptPreparation:
+    idea: str
+    phase: PhaseConfig
+    body: dict
+    system: str
+    verify_system: str
+
+
+def prepare_concept(idea: str, config: BackendConfig, thinking_options=None) -> ConceptPreparation:
+    if not idea.strip():
+        raise run.RunError("Input must not be empty.")
+    phase = config.phase("concept")
+    body = thinking_body(load_thinking_options(thinking_options), phase)
+    return ConceptPreparation(idea, phase, body, SYSTEM_PROMPT.read_text(encoding="utf-8"),
+                              VERIFY_PROMPT.read_text(encoding="utf-8"))
 
 
 def render_concept(concept: Concept) -> str:
@@ -56,17 +76,15 @@ def load_concept(directory: Path | str) -> Concept:
 
 def run_concept(directory: Path | str, config: BackendConfig, *, backend: str = "local",
                 thinking_options=None, timeout: float = 600,
-                gateway_factory=OpenAICompatibleGateway) -> Concept:
+                gateway_factory=OpenAICompatibleGateway, prepared=None) -> Concept:
     """00_input.txt から 02_concept.md を作る。
 
     生成結果はまず 02_concept.md に書き、そのあとパースする。形式が崩れていた場合、
     ファイルは残したままエラーで止める。人がその場で直して次の stage に進めるようにするため。
     """
     directory = run.open_run(directory)
-    idea = run.read_input(directory)
-    phase = config.phase("concept")
-    body = thinking_body(load_thinking_options(thinking_options), phase)
-    system = SYSTEM_PROMPT.read_text(encoding="utf-8")
+    prepared = prepared or prepare_concept(run.read_input(directory), config, thinking_options)
+    idea, phase, body, system = prepared.idea, prepared.phase, prepared.body, prepared.system
 
     with gateway_factory(
         model=phase.model, base_url=config.base_url, api_key=config.api_key.get_secret_value(),
@@ -76,22 +94,22 @@ def run_concept(directory: Path | str, config: BackendConfig, *, backend: str = 
         text = gateway.text(create_messages(system=system, user=idea))
 
     (directory / run.CONCEPT).write_text(text.strip() + "\n", encoding="utf-8")
+    record_output(directory / run.CONCEPT)
     return parse_concept(text)
 
 
 def verify_concept(directory: Path | str, config: BackendConfig, *, backend: str = "local",
                    thinking_options=None, timeout: float = 600,
-                   gateway_factory=OpenAICompatibleGateway) -> ConceptReport:
+                   gateway_factory=OpenAICompatibleGateway, prepared=None) -> ConceptReport:
     """00_input.txt と 02_concept.md を照合し、02_concept_report.json を書く。
 
     報告のみで処理は止めない(SPEC.md「Concept」)。照合には Concept と同じモデルを使う。
     """
     directory = run.open_run(directory)
-    idea = run.read_input(directory)
+    prepared = prepared or prepare_concept(run.read_input(directory), config, thinking_options)
+    idea = prepared.idea
     concept_text = (directory / run.CONCEPT).read_text(encoding="utf-8")
-    phase = config.phase("concept")
-    body = thinking_body(load_thinking_options(thinking_options), phase)
-    system = VERIFY_PROMPT.read_text(encoding="utf-8")
+    phase, body, system = prepared.phase, prepared.body, prepared.verify_system
     user = f"""# ユーザ入力
 
 {idea}
@@ -109,6 +127,7 @@ def verify_concept(directory: Path | str, config: BackendConfig, *, backend: str
 
     (directory / run.CONCEPT_REPORT).write_text(
         json.dumps(report.model_dump(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    record_output(directory / run.CONCEPT_REPORT)
     return report
 
 
@@ -146,8 +165,6 @@ def _parse_bullets(lines: list[str]) -> list[str]:
         if not stripped.startswith("- "):
             raise ConceptFormatError(f"制約 must be a '- ' list: {stripped[:30]}")
         items.append(stripped[2:].strip())
-    if not items:
-        raise ConceptFormatError("制約 must have at least one item.")
     return items
 
 
@@ -164,8 +181,6 @@ def _parse_numbered(lines: list[str]) -> list[str]:
         if int(number) != len(items) + 1:
             raise ConceptFormatError(f"出来事 must be numbered from 1 without gaps: {stripped[:30]}")
         items.append(rest.strip())
-    if not items:
-        raise ConceptFormatError("出来事 must have at least one item.")
     return items
 
 

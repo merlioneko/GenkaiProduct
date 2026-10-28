@@ -1,0 +1,48 @@
+{
+  "meta": {
+    "genre": "短編",
+    "tone": "平静",
+    "style": "三人称",
+    "pov": "蓮"
+  },
+  "constraints": [],
+  "events": [],
+  "characters": [
+    {
+      "name": "蓮",
+      "persona": "落ち着いた人物",
+      "appearance": "普段着",
+      "speech_examples": [
+        "そうか"
+      ],
+      "notes": ""
+    }
+  ],
+  "settings": [
+    {
+      "name": "工房",
+      "kind": "place",
+      "notes": ""
+    },
+    {
+      "name": "世界の法則",
+      "kind": "worldrule",
+      "notes": "現実の道具と身体。魔法はない。"
+    }
+  ],
+  "scenes": [
+    {
+      "name": "動作の場面",
+      "opening": {
+        "place": "工房",
+        "time_of_day": "昼",
+        "weather": "晴れ"
+      },
+      "beats": [
+        "蓮が工房で平たい打撃面の槌を使って鉄板を叩く"
+      ],
+      "covers": [],
+      "target_chars": 1000
+    }
+  ]
+}

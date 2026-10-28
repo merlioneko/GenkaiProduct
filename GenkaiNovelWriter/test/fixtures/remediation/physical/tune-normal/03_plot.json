@@ -1,0 +1,48 @@
+{
+  "meta": {
+    "genre": "短編",
+    "tone": "平静",
+    "style": "三人称",
+    "pov": "葵"
+  },
+  "constraints": [],
+  "events": [],
+  "characters": [
+    {
+      "name": "葵",
+      "persona": "落ち着いた人物",
+      "appearance": "普段着",
+      "speech_examples": [
+        "そうか"
+      ],
+      "notes": ""
+    }
+  ],
+  "settings": [
+    {
+      "name": "倉庫",
+      "kind": "place",
+      "notes": ""
+    },
+    {
+      "name": "世界の法則",
+      "kind": "worldrule",
+      "notes": "現実の人間の身体。魔法はない。"
+    }
+  ],
+  "scenes": [
+    {
+      "name": "動作の場面",
+      "opening": {
+        "place": "倉庫",
+        "time_of_day": "昼",
+        "weather": "晴れ"
+      },
+      "beats": [
+        "葵が鍵を受け取って倉庫を開ける"
+      ],
+      "covers": [],
+      "target_chars": 1000
+    }
+  ]
+}

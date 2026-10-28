@@ -157,6 +157,14 @@ def execute(study: Path, config_path: Path, *, gateway_factory=OpenAICompatibleG
                 def last_response(self):
                     return delegate.last_response
 
+                @property
+                def last_call_id(self):
+                    return getattr(delegate, "last_call_id", None)
+
+                @property
+                def last_error_code(self):
+                    return getattr(delegate, "last_error_code", None)
+
                 def parse(self, messages, model_cls):
                     before = snapshot(config)
                     entry = {"phase": kwargs["phase"], "before": before}

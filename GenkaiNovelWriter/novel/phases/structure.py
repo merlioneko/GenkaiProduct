@@ -5,13 +5,15 @@
 """
 
 from pathlib import Path
+from dataclasses import dataclass
 
 from pydantic import ValidationError
 
 from novel import run
-from novel.phases.concept import load_concept
+from novel.phases.concept import parse_concept, ConceptFormatError
+from novel.history import read_source, record_output
 from novel.schema import Plot
-from util.config import PROJECT_ROOT, BackendConfig, load_thinking_options, thinking_body
+from util.config import PROJECT_ROOT, BackendConfig, PhaseConfig, load_thinking_options, thinking_body
 from util.gateway import OpenAICompatibleGateway, create_messages
 
 SYSTEM_PROMPT = PROJECT_ROOT / "prompts/structure/system.md"
@@ -26,13 +28,38 @@ class PlotFormatError(ValueError):
     """03_plot.json が Plot スキーマになっていない。"""
 
 
-def load_plot(directory: Path | str) -> Plot:
+@dataclass(frozen=True)
+class StructurePreparation:
+    phase: PhaseConfig
+    body: dict
+    system: str
+
+
+def prepare_structure(config: BackendConfig, thinking_options=None) -> StructurePreparation:
+    phase = config.phase("structure")
+    return StructurePreparation(phase, thinking_body(load_thinking_options(thinking_options), phase),
+                                SYSTEM_PROMPT.read_text(encoding="utf-8"))
+
+
+def prepare_input(directory: Path):
+    path = directory / run.CONCEPT
+    if not path.is_file():
+        raise ConceptFormatError(f"{run.CONCEPT} not found. Run 'stage concept' first.")
+    text, fingerprint = read_source(path)
+    return parse_concept(text), text, {run.CONCEPT: fingerprint}
+
+
+def load_plot(directory: Path | str, *, fingerprints=None) -> Plot:
     """03_plot.json を読む。手で壊されていれば、修復せずここで止まる(D24)。"""
     path = Path(directory) / run.PLOT
     if not path.is_file():
         raise PlotFormatError(f"{run.PLOT} not found. Run 'stage structure' first.")
     try:
-        return Plot.model_validate_json(path.read_text(encoding="utf-8"))
+        text, fingerprint = read_source(path)
+        plot = Plot.model_validate_json(text)
+        if fingerprints is not None:
+            fingerprints[run.PLOT] = fingerprint
+        return plot
     except ValidationError as error:
         locations = [".".join(map(str, item["loc"])) for item in error.errors()]
         raise PlotFormatError(f"{run.PLOT} does not match the Plot schema: " + ", ".join(locations)) from None
@@ -41,19 +68,18 @@ def load_plot(directory: Path | str) -> Plot:
 def save_plot(directory: Path | str, plot: Plot) -> Path:
     path = Path(directory) / run.PLOT
     path.write_text(plot.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    record_output(path)
     return path
 
 
 def run_structure(directory: Path | str, config: BackendConfig, *, backend: str = "local",
                   thinking_options=None, timeout: float = 600, retries: int = RETRIES,
-                  gateway_factory=OpenAICompatibleGateway) -> Plot:
+                  gateway_factory=OpenAICompatibleGateway, prepared=None, inputs=None) -> Plot:
     """02_concept.md から 03_plot.json を作る。"""
     directory = run.open_run(directory)
-    concept = load_concept(directory)
-    concept_text = (directory / run.CONCEPT).read_text(encoding="utf-8")
-    phase = config.phase("structure")
-    body = thinking_body(load_thinking_options(thinking_options), phase)
-    system = SYSTEM_PROMPT.read_text(encoding="utf-8")
+    concept, concept_text, _ = inputs if inputs is not None else prepare_input(directory)
+    prepared = prepared or prepare_structure(config, thinking_options)
+    phase, body, system = prepared.phase, prepared.body, prepared.system
 
     plot = None
     raw = ""
@@ -70,6 +96,7 @@ def run_structure(directory: Path | str, config: BackendConfig, *, backend: str 
                 raw = _last_text(gateway)
     if plot is None:
         (directory / run.PLOT_RAW).write_text(raw, encoding="utf-8")
+        record_output(directory / run.PLOT_RAW)
         raise StructureError(
             f"Plot did not match the schema in {retries + 1} attempts. "
             f"The last raw output is in {run.PLOT_RAW}."
@@ -78,6 +105,8 @@ def run_structure(directory: Path | str, config: BackendConfig, *, backend: str 
     # 指定要素は Concept の値をそのまま転記し、生成結果に上書きする(SPEC.md「Structure」)。
     plot = plot.model_copy(update={"constraints": list(concept.constraints),
                                    "events": list(concept.events)})
+    if not concept.events:
+        plot = plot.model_copy(update={"scenes": [scene.model_copy(update={"covers": []}) for scene in plot.scenes]})
     save_plot(directory, plot)
     return plot
 

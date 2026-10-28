@@ -6,10 +6,12 @@
 
 import json
 import shutil
+import os
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
-from util.config import PROJECT_ROOT
+from util.config import PROJECT_ROOT, public_config
 
 CREATIONS = PROJECT_ROOT / "creations"
 
@@ -36,6 +38,7 @@ DOWNSTREAM = {
     "structure": [PLOT, PLOT_REPORT, PLOT_RAW, SCENES, DRAFT, CHECK, CHECK_REPORT, EVAL],
     "writing": [SCENES, DRAFT, CHECK, CHECK_REPORT, EVAL],
     "check": [CHECK, CHECK_REPORT],
+    "assemble": [DRAFT, CHECK, CHECK_REPORT, EVAL],
 }
 
 
@@ -57,9 +60,11 @@ def create_output_dir(root: Path, prefix: str) -> Path:
     raise FileExistsError("Cannot allocate a new output directory.")
 
 
-def create_run(input_path: Path | str, *, output_root: Path | str | None = None) -> Path:
+def create_run(input_path: Path | str, *, output_root: Path | str | None = None,
+               idea: str | None = None) -> Path:
     """新しい実行ディレクトリを作り、00_input.txt を書く。"""
-    idea = Path(input_path).read_text(encoding="utf-8")
+    if idea is None:
+        idea = Path(input_path).read_text(encoding="utf-8")
     if not idea.strip():
         raise ValueError("Input must not be empty.")
     directory = create_output_dir(Path(output_root or CREATIONS), "")
@@ -78,21 +83,37 @@ def open_run(directory: Path | str) -> Path:
 
 
 def read_input(directory: Path | str) -> str:
-    return (Path(directory) / INPUT).read_text(encoding="utf-8")
+    text = (Path(directory) / INPUT).read_text(encoding="utf-8")
+    if not text.strip():
+        raise RunError("Input must not be empty.")
+    return text
 
 
 def save_config_snapshot(directory: Path | str, backend: str, config) -> Path:
-    """01_config.json。どのモデルで作った成果物かを後から特定するため。api_key は書かない。"""
-    snapshot = {
-        "backend": backend,
-        "base_url": config.base_url,
-        "context_length": config.context_length,
-        "phases": {name: {"model": phase.model, "thinking": phase.thinking}
-                   for name, phase in config.phases.items()},
-    }
+    """01_config.jsonは新規開始時だけ保存する。操作ごとの条件はD56の履歴へ残す。"""
+    snapshot = public_config(config, backend)
     path = Path(directory) / CONFIG_SNAPSHOT
-    path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    with path.open("x", encoding="utf-8") as stream:
+        stream.write(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n")
+    from novel.history import record_output
+    record_output(path)
     return path
+
+
+def atomic_write(path: Path, text: str) -> None:
+    """同じディレクトリの一時ファイルから置換し、書きかけを公開しない。"""
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
+                                         delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(text)
+        os.replace(temporary, path)
+        from novel.history import record_output
+        record_output(path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def scene_path(directory: Path | str, number: int) -> Path:
@@ -131,6 +152,11 @@ def archive(directory: Path | str, targets: list[str]) -> Path | None:
     if not present:
         return None
     destination = create_output_dir(directory / ARCHIVE, "")
+    from novel.history import CURRENT
+    operation = CURRENT.get()
+    if operation is not None:
+        # 移動が途中で失敗しても、既に作った退避先を結果へ残す。
+        operation.archive = destination
     for name in present:
         moved = destination / name
         moved.parent.mkdir(parents=True, exist_ok=True)

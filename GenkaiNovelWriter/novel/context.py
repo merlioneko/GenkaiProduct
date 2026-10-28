@@ -5,10 +5,12 @@ from pathlib import Path
 
 from novel import run
 from novel.schema import Novel, NovelScene, Plot
+from novel.history import read_source
 from util.gateway import create_messages
 
 
-def load_novel(directory: Path | str, plot: Plot, *, until: int | None = None) -> Novel:
+def load_novel(directory: Path | str, plot: Plot, *, until: int | None = None,
+               fingerprints=None) -> Novel:
     """1〜until-1 (未指定なら全シーン)を読む。欠落・空本文は修復しない。"""
     stop = len(plot.scenes) + 1 if until is None else until
     if not 1 <= stop <= len(plot.scenes) + 1:
@@ -18,17 +20,32 @@ def load_novel(directory: Path | str, plot: Plot, *, until: int | None = None) -
         path = run.scene_path(directory, number)
         if not path.is_file():
             raise run.RunError(f"Missing prior scene: {path.name}")
-        content = path.read_text(encoding="utf-8")
+        content, fingerprint = read_source(path)
         if not content.strip():
             raise run.RunError(f"Empty scene: {path.name}")
         scenes.append(NovelScene(index=number, title=plot.scenes[number - 1].name, content=content))
+        if fingerprints is not None:
+            fingerprints[f"{run.SCENES}/{path.name}"] = fingerprint
     return Novel(scenes=scenes)
 
 
-def writing_messages(directory: Path | str, plot: Plot, number: int, system: str) -> list:
+def complete_novel(directory: Path | str, plot: Plot, *, fingerprints=None) -> Novel:
+    expected = [run.scene_path(directory, i) for i in range(1, len(plot.scenes) + 1)]
+    if run.scene_paths(directory) != expected:
+        raise run.RunError("Requires exactly the completed scenes listed in Plot.")
+    return load_novel(directory, plot, fingerprints=fingerprints)
+
+
+def draft_text(novel: Novel) -> str:
+    return "\n\n".join(scene.content for scene in novel.scenes) + "\n"
+
+
+def writing_messages(directory: Path | str, plot: Plot, number: int, system: str,
+                     *, novel: Novel | None = None) -> list:
     if not 1 <= number <= len(plot.scenes):
         raise run.RunError(f"Scene number must be between 1 and {len(plot.scenes)}: {number}")
-    novel = load_novel(directory, plot, until=number)
+    if novel is None:
+        novel = load_novel(directory, plot, until=number)
     scene = plot.scenes[number - 1]
 
     def dump(value):

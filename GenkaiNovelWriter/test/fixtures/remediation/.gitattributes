@@ -1,0 +1,2 @@
+# Manifest hashes describe exact synthetic corpus bytes on every checkout.
+physical/** -text

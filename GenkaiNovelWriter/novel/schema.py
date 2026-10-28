@@ -109,7 +109,7 @@ class CheckIssue(BaseModel):
 class CheckResult(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     item: Literal["contamination", "length", "elements", "consistency", "physical"] = Field(description="検査項目名")
-    issues: list[CheckIssue] = Field(default_factory=list)
+    issues: list[CheckIssue] = Field(description="指摘の配列。指摘なしでも空配列を明示する")
 
 
 class SceneLength(BaseModel):
